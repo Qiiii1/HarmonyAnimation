@@ -1,5 +1,7 @@
 import curves from '@ohos.curves';
 import {
+  taskbarUpFollowerReleaseMultiplier,
+  taskbarUpFollowerReleaseTranslateX,
   taskbarUpReleaseDurations,
   taskbarUpReleaseEaseIn,
   taskbarUpReleaseEaseOut
@@ -21,6 +23,8 @@ struct TaskbarUpPage {
   @State leadCardReleaseProgress: number = 0;
   @State leadCardReleaseScaleValue: number = 1;
   @State leadCardTranslateAtRelease: number = 0;
+  @State followerCardReleaseSegmentProgress: number = 0;
+  @State followerCardReleaseReturning: boolean = false;
   // 可调参数：上滑时的阻尼比。
   // 控制手指上滑距离和动画实际推进距离的比值；值越大越沉，值越小越跟手。
   @StorageLink('taskbarUpSwipeDampingRatio') upSwipeDampingRatio: number = 1.5;
@@ -39,6 +43,7 @@ struct TaskbarUpPage {
   private rowTouchStartWindowY: number = 0;
   private verticalDragStartY: number = 0;
   private verticalDragStartProgress: number = 0;
+  private followerCardReleaseStartX: number = 0;
 
   private readonly CARD_COUNT: number = 4;
   private readonly INITIAL_CENTER_INDEX: number = 3;
@@ -89,6 +94,7 @@ struct TaskbarUpPage {
   private readonly LEAD_CARD_DRAG_PREVIEW_VISIBLE_WIDTH: number = 56;
   private readonly LEAD_CARD_RELEASE_SCALE_DURATION_MS: number = 80;
   private readonly LEAD_CARD_RELEASE_SPRING_DAMPING: number = 0.54;
+  private readonly FOLLOW_CARD_RELEASE_OVERSHOOT_FALLOFF: number = 0.58;
   private readonly LEAD_CARD_RELEASE_FRAME_MS: number = 16;
   private readonly CARD_VIEWPORT_PADDING_Y: number = 92;
   private readonly CARD_TRANSLATE_SETTLE_END_PROGRESS: number = 0.32;
@@ -173,6 +179,30 @@ struct TaskbarUpPage {
     return this.CARD_WIDTH * this.clamp(this.cardBounceOvershootX, 0, 100) / 100;
   }
 
+  private cardReleaseOvershootMultiplier(index: number): number {
+    return taskbarUpFollowerReleaseMultiplier(
+      index,
+      this.INITIAL_CENTER_INDEX,
+      this.FOLLOW_CARD_RELEASE_OVERSHOOT_FALLOFF
+    );
+  }
+
+  private cardBounceOvershootPxForIndex(index: number): number {
+    return this.cardBounceOvershootPx() * this.cardReleaseOvershootMultiplier(index);
+  }
+
+  private followerCardReleaseTranslateX(index: number): number {
+    return taskbarUpFollowerReleaseTranslateX(
+      index,
+      this.INITIAL_CENTER_INDEX,
+      this.FOLLOW_CARD_RELEASE_OVERSHOOT_FALLOFF,
+      this.followerCardReleaseStartX,
+      this.cardBounceOvershootPx(),
+      this.followerCardReleaseReturning,
+      this.followerCardReleaseSegmentProgress
+    );
+  }
+
   private leadCardReleaseTotalDurationMs(): number {
     return Math.max(2, Math.floor(this.leadCardReleaseDurationMs));
   }
@@ -197,6 +227,7 @@ struct TaskbarUpPage {
     endX: number,
     startTime: number,
     durationMs: number,
+    followerReturning: boolean,
     easing: (progress: number) => number,
     onFinish: () => void
   ): void {
@@ -206,16 +237,30 @@ struct TaskbarUpPage {
 
     const elapsed = Date.now() - startTime;
     const progress = this.clamp(elapsed / Math.max(durationMs, 1), 0, 1);
-    this.leadCardTranslateAtRelease = this.lerp(startX, endX, easing(progress));
+    const easedProgress = easing(progress);
+    this.leadCardTranslateAtRelease = this.lerp(startX, endX, easedProgress);
+    this.followerCardReleaseReturning = followerReturning;
+    this.followerCardReleaseSegmentProgress = easedProgress;
 
     if (progress < 1) {
       setTimeout(() => {
-        this.runLeadCardReleaseSegment(activeToken, startX, endX, startTime, durationMs, easing, onFinish);
+        this.runLeadCardReleaseSegment(
+          activeToken,
+          startX,
+          endX,
+          startTime,
+          durationMs,
+          followerReturning,
+          easing,
+          onFinish
+        );
       }, this.LEAD_CARD_RELEASE_FRAME_MS);
       return;
     }
 
     this.leadCardTranslateAtRelease = endX;
+    this.followerCardReleaseReturning = followerReturning;
+    this.followerCardReleaseSegmentProgress = 1;
     onFinish();
   }
 
@@ -224,10 +269,20 @@ struct TaskbarUpPage {
     startX: number,
     endX: number,
     durationMs: number,
+    followerReturning: boolean,
     easing: (progress: number) => number,
     onFinish: () => void
   ): void {
-    this.runLeadCardReleaseSegment(activeToken, startX, endX, Date.now(), durationMs, easing, onFinish);
+    this.runLeadCardReleaseSegment(
+      activeToken,
+      startX,
+      endX,
+      Date.now(),
+      durationMs,
+      followerReturning,
+      easing,
+      onFinish
+    );
   }
 
   private currentLeadCardPreviewScale(): number {
@@ -455,6 +510,9 @@ struct TaskbarUpPage {
     if (this.isDragPreviewActive()) {
       return index === this.INITIAL_CENTER_INDEX;
     }
+    if (this.isReleaseFromClosedActive()) {
+      return true;
+    }
     return this.cardRenderTimelineProgress(index) >= this.cardEnterStartProgress(index);
   }
 
@@ -543,8 +601,12 @@ struct TaskbarUpPage {
       return this.currentLeadCardPreviewTranslateX();
     }
 
-    if (isLeadCard && this.isReleaseFromClosedActive()) {
+    if (this.isReleaseFromClosedActive() && isLeadCard) {
       return this.leadCardTranslateAtRelease;
+    }
+
+    if (this.isReleaseFromClosedActive() && !isLeadCard) {
+      return this.followerCardReleaseTranslateX(index);
     }
 
     if (isLeadCard && this.expanded && this.verticalDragStartProgress <= 0.001 && this.openProgress >= 0.999) {
@@ -568,15 +630,16 @@ struct TaskbarUpPage {
     }
     const bounceSplit = this.cardBounceSplit();
     const bounceWindowT = this.clamp((enterT - settleEnd) / (1 - settleEnd), 0, 1);
+    const bounceOvershootX = this.cardBounceOvershootPxForIndex(index);
     if (bounceWindowT < bounceSplit) {
       return this.lerp(
         0,
-        this.cardBounceOvershootPx(),
+        bounceOvershootX,
         bounceWindowT / bounceSplit
       );
     }
     return this.lerp(
-      this.cardBounceOvershootPx(),
+      bounceOvershootX,
       0,
       (bounceWindowT - bounceSplit) / (1 - bounceSplit)
     );
@@ -993,6 +1056,9 @@ struct TaskbarUpPage {
       if (openingFromClosed) {
         this.leadCardReleaseScaleValue = this.currentLeadCardPreviewScale();
         this.leadCardTranslateAtRelease = this.currentLeadCardPreviewTranslateX();
+        this.followerCardReleaseStartX = this.leadCardTranslateAtRelease;
+        this.followerCardReleaseReturning = false;
+        this.followerCardReleaseSegmentProgress = 0;
         this.leadCardReleaseProgress = 0;
       }
     } else {
@@ -1002,6 +1068,8 @@ struct TaskbarUpPage {
       this.leadCardReleaseProgress = 0;
       this.leadCardReleaseScaleValue = 1;
       this.leadCardTranslateAtRelease = 0;
+      this.followerCardReleaseReturning = false;
+      this.followerCardReleaseSegmentProgress = 0;
     }
 
     const openAnimationDuration = openingFromClosed
@@ -1016,6 +1084,8 @@ struct TaskbarUpPage {
         if (target > 0) {
           this.closingRecents = false;
           this.leadCardTranslateAtRelease = 0;
+          this.followerCardReleaseReturning = true;
+          this.followerCardReleaseSegmentProgress = 1;
           this.leadCardReleaseProgress = 1;
           this.playInitialWakeSnap();
         } else {
@@ -1047,6 +1117,7 @@ struct TaskbarUpPage {
         releaseStartX,
         releaseOvershootX,
         releaseForwardDuration,
+        false,
         taskbarUpReleaseEaseOut,
         () => {
           if (token !== this.reboundAnimationToken) {
@@ -1057,6 +1128,7 @@ struct TaskbarUpPage {
             releaseOvershootX,
             0,
             releaseReturnDuration,
+            true,
             taskbarUpReleaseEaseIn,
             () => {
             }

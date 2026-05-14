@@ -15,6 +15,7 @@ function loadHelper() {
     .replace(/export function ([A-Za-z0-9_]+)\(([^)]*)\): [^{]+ \{/g, 'function $1($2) {')
     .replace(/\): [A-Za-z0-9_]+ \{/g, ') {')
     .replace(/([A-Za-z0-9_]+): number/g, '$1')
+    .replace(/([A-Za-z0-9_]+): boolean/g, '$1')
     .replace(/: TaskbarUpReleaseDurations/g, '');
 
   const context = {};
@@ -22,15 +23,23 @@ function loadHelper() {
   vm.runInContext(`${jsSource}
 this.taskbarUpReleaseDurations = taskbarUpReleaseDurations;
 this.taskbarUpReleaseEaseOut = taskbarUpReleaseEaseOut;
-this.taskbarUpReleaseEaseIn = taskbarUpReleaseEaseIn;`, context);
+this.taskbarUpReleaseEaseIn = taskbarUpReleaseEaseIn;
+this.taskbarUpFollowerReleaseMultiplier = taskbarUpFollowerReleaseMultiplier;
+this.taskbarUpFollowerReleaseTranslateX = taskbarUpFollowerReleaseTranslateX;`, context);
   return context;
 }
 
 const {
   taskbarUpReleaseDurations,
   taskbarUpReleaseEaseOut,
-  taskbarUpReleaseEaseIn
+  taskbarUpReleaseEaseIn,
+  taskbarUpFollowerReleaseMultiplier,
+  taskbarUpFollowerReleaseTranslateX
 } = loadHelper();
+
+function assertAlmostEqual(actual, expected) {
+  assert.ok(Math.abs(actual - expected) < 0.000001, `${actual} !== ${expected}`);
+}
 
 const durations = taskbarUpReleaseDurations(1000, 0.3);
 assert.equal(durations.forwardMs + durations.returnMs, 1000);
@@ -49,3 +58,43 @@ assert.equal(taskbarUpReleaseEaseOut(0), 0);
 assert.equal(taskbarUpReleaseEaseOut(1), 1);
 assert.equal(taskbarUpReleaseEaseIn(0), 0);
 assert.equal(taskbarUpReleaseEaseIn(1), 1);
+
+assert.equal(taskbarUpFollowerReleaseMultiplier(3, 3, 0.58), 1);
+const trailingCard2 = taskbarUpFollowerReleaseMultiplier(2, 3, 0.58);
+const trailingCard1 = taskbarUpFollowerReleaseMultiplier(1, 3, 0.58);
+const trailingCard0 = taskbarUpFollowerReleaseMultiplier(0, 3, 0.58);
+assert.ok(trailingCard2 < 1 && trailingCard2 > 0);
+assert.ok(trailingCard1 < trailingCard2 && trailingCard1 > 0);
+assert.ok(trailingCard0 < trailingCard1 && trailingCard0 > 0);
+
+const sharedStartX = -260;
+const leadOvershootX = 24;
+const halfwayFollowerX = taskbarUpFollowerReleaseTranslateX(
+  2,
+  3,
+  0.58,
+  sharedStartX,
+  leadOvershootX,
+  false,
+  0.5
+);
+assertAlmostEqual(
+  halfwayFollowerX,
+  sharedStartX + (leadOvershootX * trailingCard2 - sharedStartX) * 0.5
+);
+assert.equal(
+  taskbarUpFollowerReleaseTranslateX(2, 3, 0.58, sharedStartX, leadOvershootX, false, 0),
+  sharedStartX
+);
+assertAlmostEqual(
+  taskbarUpFollowerReleaseTranslateX(2, 3, 0.58, sharedStartX, leadOvershootX, false, 1),
+  leadOvershootX * trailingCard2
+);
+assertAlmostEqual(
+  taskbarUpFollowerReleaseTranslateX(2, 3, 0.58, sharedStartX, leadOvershootX, true, 0),
+  leadOvershootX * trailingCard2
+);
+assert.equal(
+  taskbarUpFollowerReleaseTranslateX(2, 3, 0.58, sharedStartX, leadOvershootX, true, 1),
+  0
+);
