@@ -23,7 +23,9 @@ function loadHelper() {
   vm.runInContext(`${jsSource}
 this.taskbarUpReleaseDurations = taskbarUpReleaseDurations;
 this.taskbarUpReleaseEaseOut = taskbarUpReleaseEaseOut;
+this.taskbarUpReleaseEaseOutWithInitialSlope = taskbarUpReleaseEaseOutWithInitialSlope;
 this.taskbarUpReleaseEaseIn = taskbarUpReleaseEaseIn;
+this.taskbarUpReleaseInitialSlope = taskbarUpReleaseInitialSlope;
 this.taskbarUpFollowerReleaseMultiplier = taskbarUpFollowerReleaseMultiplier;
 this.taskbarUpFollowerReleaseTranslateX = taskbarUpFollowerReleaseTranslateX;`, context);
   return context;
@@ -32,7 +34,9 @@ this.taskbarUpFollowerReleaseTranslateX = taskbarUpFollowerReleaseTranslateX;`, 
 const {
   taskbarUpReleaseDurations,
   taskbarUpReleaseEaseOut,
+  taskbarUpReleaseEaseOutWithInitialSlope,
   taskbarUpReleaseEaseIn,
+  taskbarUpReleaseInitialSlope,
   taskbarUpFollowerReleaseMultiplier,
   taskbarUpFollowerReleaseTranslateX
 } = loadHelper();
@@ -58,6 +62,31 @@ assert.equal(taskbarUpReleaseEaseOut(0), 0);
 assert.equal(taskbarUpReleaseEaseOut(1), 1);
 assert.equal(taskbarUpReleaseEaseIn(0), 0);
 assert.equal(taskbarUpReleaseEaseIn(1), 1);
+
+assertAlmostEqual(
+  taskbarUpReleaseInitialSlope(1, 200, 300, 0.35, 2.4),
+  1.5
+);
+assert.equal(taskbarUpReleaseInitialSlope(0, 200, 300, 0.35, 2.4), 0.35);
+assert.equal(taskbarUpReleaseInitialSlope(10, 200, 300, 0.35, 2.4), 2.4);
+
+assert.equal(taskbarUpReleaseEaseOutWithInitialSlope(0, 1.5), 0);
+assert.equal(taskbarUpReleaseEaseOutWithInitialSlope(1, 1.5), 1);
+const gentleStartDelta = taskbarUpReleaseEaseOutWithInitialSlope(0.01, 0.35);
+const fastStartDelta = taskbarUpReleaseEaseOutWithInitialSlope(0.01, 2.0);
+assert.ok(
+  fastStartDelta > gentleStartDelta * 3,
+  'release curve should preserve a faster pre-release velocity at the start'
+);
+let previousReleaseEase = 0;
+for (let step = 1; step <= 100; step += 1) {
+  const currentReleaseEase = taskbarUpReleaseEaseOutWithInitialSlope(step / 100, 1.5);
+  assert.ok(
+    currentReleaseEase >= previousReleaseEase,
+    'release curve should stay monotonic while matching the initial slope'
+  );
+  previousReleaseEase = currentReleaseEase;
+}
 
 assert.equal(taskbarUpFollowerReleaseMultiplier(3, 3, 0.58), 1);
 const trailingCard2 = taskbarUpFollowerReleaseMultiplier(2, 3, 0.58);

@@ -34,6 +34,31 @@ export function taskbarUpReleaseEaseOut(
   return 1 - Math.pow(1 - t, power);
 }
 
+export function taskbarUpReleaseInitialSlope(
+  translateVelocityPxPerMs: number,
+  distancePx: number,
+  durationMs: number,
+  minSlope: number,
+  maxSlope: number
+): number {
+  const distance: number = Math.max(Math.abs(distancePx), 1);
+  const lowerBound: number = Math.min(minSlope, maxSlope);
+  const upperBound: number = Math.max(minSlope, maxSlope);
+  const rawSlope: number = Math.max(translateVelocityPxPerMs, 0) * Math.max(durationMs, 1) / distance;
+  return clamp(rawSlope, lowerBound, upperBound);
+}
+
+export function taskbarUpReleaseEaseOutWithInitialSlope(
+  progress: number,
+  initialSlope: number
+): number {
+  const t: number = clamp(progress, 0, 1);
+  const slope: number = clamp(initialSlope, 0, 3);
+  const h10: number = t * t * t - 2 * t * t + t;
+  const h01: number = -2 * t * t * t + 3 * t * t;
+  return clamp(h10 * slope + h01, 0, 1);
+}
+
 export function taskbarUpReleaseEaseIn(
   progress: number,
   power: number = TASKBAR_UP_RELEASE_EASE_POWER

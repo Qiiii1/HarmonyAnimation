@@ -3,8 +3,9 @@ import {
   taskbarUpFollowerReleaseMultiplier,
   taskbarUpFollowerReleaseTranslateX,
   taskbarUpReleaseDurations,
+  taskbarUpReleaseEaseOutWithInitialSlope,
   taskbarUpReleaseEaseIn,
-  taskbarUpReleaseEaseOut
+  taskbarUpReleaseInitialSlope
 } from './TaskbarUpReleaseMotion';
 
 @Entry
@@ -43,6 +44,9 @@ struct TaskbarUpPage {
   private rowTouchStartWindowY: number = 0;
   private verticalDragStartY: number = 0;
   private verticalDragStartProgress: number = 0;
+  private verticalDragLastTimeMs: number = 0;
+  private verticalDragLeadCardTranslateX: number = 0;
+  private verticalDragLeadCardVelocityPxPerMs: number = 0;
   private followerCardReleaseStartX: number = 0;
 
   private readonly CARD_COUNT: number = 4;
@@ -96,6 +100,10 @@ struct TaskbarUpPage {
   private readonly LEAD_CARD_RELEASE_SPRING_DAMPING: number = 0.54;
   private readonly FOLLOW_CARD_RELEASE_OVERSHOOT_FALLOFF: number = 0.58;
   private readonly LEAD_CARD_RELEASE_FRAME_MS: number = 16;
+  private readonly LEAD_CARD_RELEASE_MIN_INITIAL_SLOPE: number = 0.35;
+  private readonly LEAD_CARD_RELEASE_MAX_INITIAL_SLOPE: number = 2.4;
+  private readonly LEAD_CARD_RELEASE_VELOCITY_BLEND: number = 0.62;
+  private readonly LEAD_CARD_RELEASE_VELOCITY_STALE_MS: number = 72;
   private readonly CARD_VIEWPORT_PADDING_Y: number = 92;
   private readonly CARD_TRANSLATE_SETTLE_END_PROGRESS: number = 0.32;
   private readonly LEAD_CARD_TRANSLATE_SETTLE_END_PROGRESS: number = 0.42;
@@ -589,6 +597,31 @@ struct TaskbarUpPage {
       this.leadCardPreviewTranslateX(),
       this.easeOut(this.dragPreviewProgress(), 2.15)
     );
+  }
+
+  private resetLeadCardDragVelocity(): void {
+    this.verticalDragLastTimeMs = Date.now();
+    this.verticalDragLeadCardTranslateX = this.currentLeadCardPreviewTranslateX();
+    this.verticalDragLeadCardVelocityPxPerMs = 0;
+  }
+
+  private trackLeadCardDragVelocity(nextTranslateX: number): void {
+    const now = Date.now();
+    const elapsedMs = Math.max(now - this.verticalDragLastTimeMs, 1);
+    const instantVelocity = (nextTranslateX - this.verticalDragLeadCardTranslateX) / elapsedMs;
+    const blend = this.clamp(this.LEAD_CARD_RELEASE_VELOCITY_BLEND, 0, 1);
+    this.verticalDragLeadCardVelocityPxPerMs = instantVelocity <= 0
+      ? 0
+      : this.lerp(this.verticalDragLeadCardVelocityPxPerMs, instantVelocity, blend);
+    this.verticalDragLeadCardTranslateX = nextTranslateX;
+    this.verticalDragLastTimeMs = now;
+  }
+
+  private currentLeadCardReleaseVelocityPxPerMs(): number {
+    if (Date.now() - this.verticalDragLastTimeMs > this.LEAD_CARD_RELEASE_VELOCITY_STALE_MS) {
+      return 0;
+    }
+    return this.verticalDragLeadCardVelocityPxPerMs;
   }
 
   private cardTranslateX(index: number): number {
@@ -1104,6 +1137,13 @@ struct TaskbarUpPage {
       const releaseOvershootX = this.cardBounceOvershootPx();
       const releaseForwardDuration = this.leadCardReleaseForwardDurationMs();
       const releaseReturnDuration = this.leadCardReleaseReturnDurationMs();
+      const releaseInitialSlope = taskbarUpReleaseInitialSlope(
+        this.currentLeadCardReleaseVelocityPxPerMs(),
+        releaseOvershootX - releaseStartX,
+        releaseForwardDuration,
+        this.LEAD_CARD_RELEASE_MIN_INITIAL_SLOPE,
+        this.LEAD_CARD_RELEASE_MAX_INITIAL_SLOPE
+      );
 
       this.getUIContext().animateTo({
         duration: this.LEAD_CARD_RELEASE_SCALE_DURATION_MS,
@@ -1118,7 +1158,7 @@ struct TaskbarUpPage {
         releaseOvershootX,
         releaseForwardDuration,
         false,
-        taskbarUpReleaseEaseOut,
+        (progress: number): number => taskbarUpReleaseEaseOutWithInitialSlope(progress, releaseInitialSlope),
         () => {
           if (token !== this.reboundAnimationToken) {
             return;
@@ -1151,11 +1191,13 @@ struct TaskbarUpPage {
       this.draggingVertical = true;
       this.verticalDragStartY = touchY;
       this.verticalDragStartProgress = this.openProgress;
+      this.resetLeadCardDragVelocity();
       if (this.verticalDragStartProgress <= 0.001) {
         this.prepareInitialScroll();
         this.leadCardReleaseProgress = 0;
         this.leadCardReleaseScaleValue = this.LEAD_CARD_ENTER_START_SCALE;
         this.leadCardTranslateAtRelease = this.cardHiddenStartX(this.INITIAL_CENTER_INDEX);
+        this.resetLeadCardDragVelocity();
       }
       this.reboundAnimationToken += 1;
       this.edgeSnapOffsetX = 0;
@@ -1168,6 +1210,9 @@ struct TaskbarUpPage {
         + deltaY / (this.TRIGGER_DRAG_DISTANCE * Math.max(this.upSwipeDampingRatio, 0.01));
       const nextProgress = this.clamp(rawProgress, 0, 1);
       this.openProgress = nextProgress;
+      if (this.verticalDragStartProgress <= 0.001) {
+        this.trackLeadCardDragVelocity(this.currentLeadCardPreviewTranslateX());
+      }
       this.expanded = nextProgress > 0.001;
       if (nextProgress <= 0.001) {
         this.edgeSnapOffsetX = 0;
