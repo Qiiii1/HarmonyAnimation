@@ -3,8 +3,7 @@ import {
   taskbarUpFollowerReleaseMultiplier,
   taskbarUpFollowerReleaseTranslateX,
   taskbarUpReleaseDurations,
-  taskbarUpReleaseEaseOutWithInitialSlope,
-  taskbarUpReleaseEaseIn,
+  taskbarUpReleaseForwardControlY,
   taskbarUpReleaseInitialSlope
 } from './TaskbarUpReleaseMotion';
 
@@ -96,14 +95,16 @@ struct TaskbarUpPage {
   private readonly LEAD_CARD_ENTER_START_SCALE: number = 1.24;
   private readonly CARD_DRAG_PREVIEW_MAX_PROGRESS: number = 0.32;
   private readonly LEAD_CARD_DRAG_PREVIEW_VISIBLE_WIDTH: number = 56;
-  private readonly LEAD_CARD_RELEASE_SCALE_DURATION_MS: number = 80;
-  private readonly LEAD_CARD_RELEASE_SPRING_DAMPING: number = 0.54;
   private readonly FOLLOW_CARD_RELEASE_OVERSHOOT_FALLOFF: number = 0.58;
-  private readonly LEAD_CARD_RELEASE_FRAME_MS: number = 16;
   private readonly LEAD_CARD_RELEASE_MIN_INITIAL_SLOPE: number = 0.35;
   private readonly LEAD_CARD_RELEASE_MAX_INITIAL_SLOPE: number = 2.4;
   private readonly LEAD_CARD_RELEASE_VELOCITY_BLEND: number = 0.62;
   private readonly LEAD_CARD_RELEASE_VELOCITY_STALE_MS: number = 72;
+  private readonly LEAD_CARD_RELEASE_FORWARD_X1: number = 0.24;
+  private readonly LEAD_CARD_RELEASE_FORWARD_X2: number = 0.66;
+  private readonly LEAD_CARD_RELEASE_RETURN_X1: number = 0.38;
+  private readonly LEAD_CARD_RELEASE_RETURN_X2: number = 0.82;
+  private readonly LEAD_CARD_RELEASE_RETURN_Y2: number = 0.14;
   private readonly CARD_VIEWPORT_PADDING_Y: number = 92;
   private readonly CARD_TRANSLATE_SETTLE_END_PROGRESS: number = 0.32;
   private readonly LEAD_CARD_TRANSLATE_SETTLE_END_PROGRESS: number = 0.42;
@@ -229,68 +230,57 @@ struct TaskbarUpPage {
     ).returnMs;
   }
 
-  private runLeadCardReleaseSegment(
+  private playLeadCardReleaseMotion(
     activeToken: number,
     startX: number,
-    endX: number,
-    startTime: number,
-    durationMs: number,
-    followerReturning: boolean,
-    easing: (progress: number) => number,
-    onFinish: () => void
+    overshootX: number,
+    forwardDurationMs: number,
+    returnDurationMs: number,
+    initialSlope: number
   ): void {
     if (activeToken !== this.reboundAnimationToken) {
       return;
     }
 
-    const elapsed = Date.now() - startTime;
-    const progress = this.clamp(elapsed / Math.max(durationMs, 1), 0, 1);
-    const easedProgress = easing(progress);
-    this.leadCardTranslateAtRelease = this.lerp(startX, endX, easedProgress);
-    this.followerCardReleaseReturning = followerReturning;
-    this.followerCardReleaseSegmentProgress = easedProgress;
+    this.leadCardTranslateAtRelease = startX;
+    this.followerCardReleaseReturning = false;
+    this.followerCardReleaseSegmentProgress = 0;
 
-    if (progress < 1) {
-      setTimeout(() => {
-        this.runLeadCardReleaseSegment(
-          activeToken,
-          startX,
-          endX,
-          startTime,
-          durationMs,
-          followerReturning,
-          easing,
-          onFinish
-        );
-      }, this.LEAD_CARD_RELEASE_FRAME_MS);
-      return;
-    }
+    this.getUIContext().animateTo({
+      duration: forwardDurationMs,
+      curve: curves.cubicBezierCurve(
+        this.LEAD_CARD_RELEASE_FORWARD_X1,
+        taskbarUpReleaseForwardControlY(initialSlope, this.LEAD_CARD_RELEASE_FORWARD_X1),
+        this.LEAD_CARD_RELEASE_FORWARD_X2,
+        1
+      ),
+      onFinish: () => {
+        if (activeToken !== this.reboundAnimationToken) {
+          return;
+        }
 
-    this.leadCardTranslateAtRelease = endX;
-    this.followerCardReleaseReturning = followerReturning;
-    this.followerCardReleaseSegmentProgress = 1;
-    onFinish();
-  }
+        this.leadCardTranslateAtRelease = overshootX;
+        this.followerCardReleaseReturning = true;
+        this.followerCardReleaseSegmentProgress = 0;
 
-  private playLeadCardReleaseSegment(
-    activeToken: number,
-    startX: number,
-    endX: number,
-    durationMs: number,
-    followerReturning: boolean,
-    easing: (progress: number) => number,
-    onFinish: () => void
-  ): void {
-    this.runLeadCardReleaseSegment(
-      activeToken,
-      startX,
-      endX,
-      Date.now(),
-      durationMs,
-      followerReturning,
-      easing,
-      onFinish
-    );
+        this.getUIContext().animateTo({
+          duration: returnDurationMs,
+          curve: curves.cubicBezierCurve(
+            this.LEAD_CARD_RELEASE_RETURN_X1,
+            0,
+            this.LEAD_CARD_RELEASE_RETURN_X2,
+            this.LEAD_CARD_RELEASE_RETURN_Y2
+          )
+        }, () => {
+          this.leadCardTranslateAtRelease = 0;
+          this.followerCardReleaseSegmentProgress = 1;
+        });
+      }
+    }, () => {
+      this.leadCardTranslateAtRelease = overshootX;
+      this.leadCardReleaseScaleValue = 1;
+      this.followerCardReleaseSegmentProgress = 1;
+    });
   }
 
   private currentLeadCardPreviewScale(): number {
@@ -1145,35 +1135,14 @@ struct TaskbarUpPage {
         this.LEAD_CARD_RELEASE_MAX_INITIAL_SLOPE
       );
 
-      this.getUIContext().animateTo({
-        duration: this.LEAD_CARD_RELEASE_SCALE_DURATION_MS,
-        curve: curves.cubicBezierCurve(0.16, 0.92, 0.24, 1)
-      }, () => {
-        this.leadCardReleaseScaleValue = 1;
-      });
-
-      this.playLeadCardReleaseSegment(
+      this.playLeadCardReleaseMotion(
         token,
         releaseStartX,
         releaseOvershootX,
         releaseForwardDuration,
-        false,
-        (progress: number): number => taskbarUpReleaseEaseOutWithInitialSlope(progress, releaseInitialSlope),
-        () => {
-          if (token !== this.reboundAnimationToken) {
-            return;
-          }
-          this.playLeadCardReleaseSegment(
-            token,
-            releaseOvershootX,
-            0,
-            releaseReturnDuration,
-            true,
-            taskbarUpReleaseEaseIn,
-            () => {
-            }
-          );
-        });
+        releaseReturnDuration,
+        releaseInitialSlope
+      );
     }
   }
 

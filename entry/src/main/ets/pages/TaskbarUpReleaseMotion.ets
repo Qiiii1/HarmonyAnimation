@@ -48,15 +48,11 @@ export function taskbarUpReleaseInitialSlope(
   return clamp(rawSlope, lowerBound, upperBound);
 }
 
-export function taskbarUpReleaseEaseOutWithInitialSlope(
-  progress: number,
-  initialSlope: number
+export function taskbarUpReleaseForwardControlY(
+  initialSlope: number,
+  controlX: number
 ): number {
-  const t: number = clamp(progress, 0, 1);
-  const slope: number = clamp(initialSlope, 0, 3);
-  const h10: number = t * t * t - 2 * t * t + t;
-  const h01: number = -2 * t * t * t + 3 * t * t;
-  return clamp(h10 * slope + h01, 0, 1);
+  return clamp(Math.max(initialSlope, 0) * clamp(controlX, 0, 1), 0, 1);
 }
 
 export function taskbarUpReleaseEaseIn(

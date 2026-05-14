@@ -6,6 +6,9 @@ import vm from 'node:vm';
 const helperPath = path.resolve(
   'entry/src/main/ets/pages/TaskbarUpReleaseMotion.ets'
 );
+const pagePath = path.resolve(
+  'entry/src/main/ets/pages/TaskbarUpPage.ets'
+);
 
 function loadHelper() {
   const source = fs.readFileSync(helperPath, 'utf8');
@@ -23,8 +26,8 @@ function loadHelper() {
   vm.runInContext(`${jsSource}
 this.taskbarUpReleaseDurations = taskbarUpReleaseDurations;
 this.taskbarUpReleaseEaseOut = taskbarUpReleaseEaseOut;
-this.taskbarUpReleaseEaseOutWithInitialSlope = taskbarUpReleaseEaseOutWithInitialSlope;
 this.taskbarUpReleaseEaseIn = taskbarUpReleaseEaseIn;
+this.taskbarUpReleaseForwardControlY = taskbarUpReleaseForwardControlY;
 this.taskbarUpReleaseInitialSlope = taskbarUpReleaseInitialSlope;
 this.taskbarUpFollowerReleaseMultiplier = taskbarUpFollowerReleaseMultiplier;
 this.taskbarUpFollowerReleaseTranslateX = taskbarUpFollowerReleaseTranslateX;`, context);
@@ -34,8 +37,8 @@ this.taskbarUpFollowerReleaseTranslateX = taskbarUpFollowerReleaseTranslateX;`, 
 const {
   taskbarUpReleaseDurations,
   taskbarUpReleaseEaseOut,
-  taskbarUpReleaseEaseOutWithInitialSlope,
   taskbarUpReleaseEaseIn,
+  taskbarUpReleaseForwardControlY,
   taskbarUpReleaseInitialSlope,
   taskbarUpFollowerReleaseMultiplier,
   taskbarUpFollowerReleaseTranslateX
@@ -69,24 +72,14 @@ assertAlmostEqual(
 );
 assert.equal(taskbarUpReleaseInitialSlope(0, 200, 300, 0.35, 2.4), 0.35);
 assert.equal(taskbarUpReleaseInitialSlope(10, 200, 300, 0.35, 2.4), 2.4);
+assertAlmostEqual(taskbarUpReleaseForwardControlY(1.5, 0.24), 0.36);
+assert.equal(taskbarUpReleaseForwardControlY(10, 0.24), 1);
+assert.equal(taskbarUpReleaseForwardControlY(-1, 0.24), 0);
 
-assert.equal(taskbarUpReleaseEaseOutWithInitialSlope(0, 1.5), 0);
-assert.equal(taskbarUpReleaseEaseOutWithInitialSlope(1, 1.5), 1);
-const gentleStartDelta = taskbarUpReleaseEaseOutWithInitialSlope(0.01, 0.35);
-const fastStartDelta = taskbarUpReleaseEaseOutWithInitialSlope(0.01, 2.0);
 assert.ok(
-  fastStartDelta > gentleStartDelta * 3,
+  taskbarUpReleaseForwardControlY(2.0, 0.24) > taskbarUpReleaseForwardControlY(0.35, 0.24),
   'release curve should preserve a faster pre-release velocity at the start'
 );
-let previousReleaseEase = 0;
-for (let step = 1; step <= 100; step += 1) {
-  const currentReleaseEase = taskbarUpReleaseEaseOutWithInitialSlope(step / 100, 1.5);
-  assert.ok(
-    currentReleaseEase >= previousReleaseEase,
-    'release curve should stay monotonic while matching the initial slope'
-  );
-  previousReleaseEase = currentReleaseEase;
-}
 
 assert.equal(taskbarUpFollowerReleaseMultiplier(3, 3, 0.58), 1);
 const trailingCard2 = taskbarUpFollowerReleaseMultiplier(2, 3, 0.58);
@@ -126,4 +119,14 @@ assertAlmostEqual(
 assert.equal(
   taskbarUpFollowerReleaseTranslateX(2, 3, 0.58, sharedStartX, leadOvershootX, true, 1),
   0
+);
+
+const pageSource = fs.readFileSync(pagePath, 'utf8');
+assert.ok(
+  !pageSource.includes('LEAD_CARD_RELEASE_FRAME_MS'),
+  'release motion should use ArkUI animateTo instead of a manual timer frame loop'
+);
+assert.ok(
+  !pageSource.includes('runLeadCardReleaseSegment'),
+  'release motion should stay on the framework animation clock'
 );
