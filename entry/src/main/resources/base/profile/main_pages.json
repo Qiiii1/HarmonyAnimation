@@ -1,0 +1,16 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/ScenePage",
+    "pages/VolumePage",
+    "pages/TaskbarUpPage",
+    "pages/UnlockDesktopPage",
+    "pages/TaskbarDownPage",
+    "pages/config/AllConfigPage",
+    "pages/config/IndexConfigPage",
+    "pages/config/VolumeConfigPage",
+    "pages/config/TaskbarUpConfigPage",
+    "pages/config/UnlockDesktopConfigPage",
+    "pages/config/TaskbarDownConfigPage"
+  ]
+}
