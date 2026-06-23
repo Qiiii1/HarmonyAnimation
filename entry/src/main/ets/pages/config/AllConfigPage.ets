@@ -1,8 +1,30 @@
-import { INDEX_PRESETS, IndexPresetItem } from './ExperimentPresetData';
-import { TASKBAR_DOWN_PRESETS, TaskbarDownPresetItem } from './ExperimentPresetData';
-import { TASKBAR_UP_PRESETS, TaskbarUpPresetItem } from './ExperimentPresetData';
-import { UNLOCK_DESKTOP_PRESETS, UnlockDesktopPresetItem } from './ExperimentPresetData';
-import { VOLUME_PRESETS, VolumePresetItem } from './ExperimentPresetData';
+import {
+  INDEX_PRESETS,
+  INDEX_SAB_PARAMETERS,
+  IndexPresetItem,
+  SabParameterItem,
+  formatSabParameterText
+} from './ExperimentPresetData';
+import {
+  TASKBAR_DOWN_PRESETS,
+  TASKBAR_DOWN_SAB_PARAMETERS,
+  TaskbarDownPresetItem
+} from './ExperimentPresetData';
+import {
+  TASKBAR_UP_PRESETS,
+  TASKBAR_UP_SAB_PARAMETERS,
+  TaskbarUpPresetItem
+} from './ExperimentPresetData';
+import {
+  UNLOCK_DESKTOP_PRESETS,
+  UNLOCK_DESKTOP_SAB_PARAMETERS,
+  UnlockDesktopPresetItem
+} from './ExperimentPresetData';
+import {
+  VOLUME_PRESETS,
+  VOLUME_SAB_PARAMETERS,
+  VolumePresetItem
+} from './ExperimentPresetData';
 
 interface AllConfigRouteOptions {
   url: string;
@@ -30,6 +52,11 @@ struct AllConfigPage {
   @State selectedTaskbarUpPresetLabel: string = '';
   @State selectedUnlockPresetLabel: string = '';
   @State selectedTaskbarDownPresetLabel: string = '';
+  @State selectedIndexSabParameterKey: string = '';
+  @State selectedVolumeSabParameterKey: string = '';
+  @State selectedTaskbarUpSabParameterKey: string = '';
+  @State selectedUnlockSabParameterKey: string = '';
+  @State selectedTaskbarDownSabParameterKey: string = '';
 
   private readonly PAGE_HORIZONTAL_PADDING: number = 18;
   private readonly PAGE_VERTICAL_PADDING: number = 24;
@@ -45,6 +72,11 @@ struct AllConfigPage {
   private readonly taskbarUpPresets: TaskbarUpPresetItem[] = TASKBAR_UP_PRESETS;
   private readonly unlockPresets: UnlockDesktopPresetItem[] = UNLOCK_DESKTOP_PRESETS;
   private readonly taskbarDownPresets: TaskbarDownPresetItem[] = TASKBAR_DOWN_PRESETS;
+  private readonly indexSabParameters: SabParameterItem[] = INDEX_SAB_PARAMETERS;
+  private readonly volumeSabParameters: SabParameterItem[] = VOLUME_SAB_PARAMETERS;
+  private readonly taskbarUpSabParameters: SabParameterItem[] = TASKBAR_UP_SAB_PARAMETERS;
+  private readonly unlockSabParameters: SabParameterItem[] = UNLOCK_DESKTOP_SAB_PARAMETERS;
+  private readonly taskbarDownSabParameters: SabParameterItem[] = TASKBAR_DOWN_SAB_PARAMETERS;
 
   private isSelected(current: number, value: number): boolean {
     return Math.abs(current - value) < 0.001;
@@ -159,6 +191,84 @@ struct AllConfigPage {
     return '';
   }
 
+  private sabParameterKey(parameter: SabParameterItem): string {
+    return `${parameter.mark}-${parameter.name}`;
+  }
+
+  private indexSabParameterMatchesCurrentValue(parameter: SabParameterItem): boolean {
+    return this.isSelected(this.indexOpenDurationMs, parameter.durationMs)
+      && this.isSelected(this.indexReboundPercent, parameter.reboundPercent);
+  }
+
+  private volumeSabParameterMatchesCurrentValue(parameter: SabParameterItem): boolean {
+    return this.isSelected(this.volumeDampingRatio, parameter.dampingRatio)
+      && this.isSelected(this.volumeInteractionPercent, parameter.reboundPercent)
+      && this.isSelected(this.volumeButtonPercent, parameter.reboundPercent);
+  }
+
+  private taskbarUpSabParameterMatchesCurrentValue(parameter: SabParameterItem): boolean {
+    return this.isSelected(this.taskbarUpReleaseDurationMs, parameter.durationMs)
+      && this.isSelected(this.taskbarUpDampingRatio, parameter.dampingRatio)
+      && this.isSelected(this.taskbarUpBounceOvershootX, parameter.reboundPercent);
+  }
+
+  private unlockSabParameterMatchesCurrentValue(parameter: SabParameterItem): boolean {
+    return this.isSelected(this.unlockDurationMs, parameter.durationMs)
+      && this.isSelected(this.unlockFollowFactor, parameter.dampingRatio)
+      && this.isSelected(this.unlockReboundPercent, parameter.reboundPercent);
+  }
+
+  private taskbarDownSabParameterMatchesCurrentValue(parameter: SabParameterItem): boolean {
+    return this.isSelected(this.taskbarDownEnterDurationMs, parameter.durationMs)
+      && this.isSelected(this.taskbarDownDampingRatio, parameter.dampingRatio)
+      && this.isSelected(this.taskbarDownReboundPercent, parameter.reboundPercent);
+  }
+
+  private currentIndexSabParameterKey(): string {
+    for (let index = 0; index < this.indexSabParameters.length; index += 1) {
+      if (this.indexSabParameterMatchesCurrentValue(this.indexSabParameters[index])) {
+        return this.sabParameterKey(this.indexSabParameters[index]);
+      }
+    }
+    return '';
+  }
+
+  private currentVolumeSabParameterKey(): string {
+    for (let index = 0; index < this.volumeSabParameters.length; index += 1) {
+      if (this.volumeSabParameterMatchesCurrentValue(this.volumeSabParameters[index])) {
+        return this.sabParameterKey(this.volumeSabParameters[index]);
+      }
+    }
+    return '';
+  }
+
+  private currentTaskbarUpSabParameterKey(): string {
+    for (let index = 0; index < this.taskbarUpSabParameters.length; index += 1) {
+      if (this.taskbarUpSabParameterMatchesCurrentValue(this.taskbarUpSabParameters[index])) {
+        return this.sabParameterKey(this.taskbarUpSabParameters[index]);
+      }
+    }
+    return '';
+  }
+
+  private currentUnlockSabParameterKey(): string {
+    for (let index = 0; index < this.unlockSabParameters.length; index += 1) {
+      if (this.unlockSabParameterMatchesCurrentValue(this.unlockSabParameters[index])) {
+        return this.sabParameterKey(this.unlockSabParameters[index]);
+      }
+    }
+    return '';
+  }
+
+  private currentTaskbarDownSabParameterKey(): string {
+    for (let index = 0; index < this.taskbarDownSabParameters.length; index += 1) {
+      if (this.taskbarDownSabParameterMatchesCurrentValue(this.taskbarDownSabParameters[index])) {
+        return this.sabParameterKey(this.taskbarDownSabParameters[index]);
+      }
+    }
+    return '';
+  }
+
   private activeIndexPresetLabel(): string {
     if (this.selectedIndexPresetLabel.length > 0) {
       return this.selectedIndexPresetLabel;
@@ -266,12 +376,14 @@ struct AllConfigPage {
 
   private applyIndexPreset(preset: IndexPresetItem): void {
     this.selectedIndexPresetLabel = preset.label;
+    this.selectedIndexSabParameterKey = '';
     this.indexOpenDurationMs = preset.durationMs;
     this.indexReboundPercent = preset.reboundPercent;
   }
 
   private applyVolumePreset(preset: VolumePresetItem): void {
     this.selectedVolumePresetLabel = preset.label;
+    this.selectedVolumeSabParameterKey = '';
     this.volumeDampingRatio = preset.dampingRatio;
     this.volumeInteractionPercent = preset.reboundPercent;
     this.volumeButtonPercent = preset.reboundPercent;
@@ -279,6 +391,7 @@ struct AllConfigPage {
 
   private applyTaskbarUpPreset(preset: TaskbarUpPresetItem): void {
     this.selectedTaskbarUpPresetLabel = preset.label;
+    this.selectedTaskbarUpSabParameterKey = '';
     this.taskbarUpReleaseDurationMs = preset.durationMs;
     this.taskbarUpDampingRatio = preset.dampingRatio;
     this.taskbarUpBounceOvershootX = preset.reboundPercent;
@@ -286,6 +399,7 @@ struct AllConfigPage {
 
   private applyUnlockPreset(preset: UnlockDesktopPresetItem): void {
     this.selectedUnlockPresetLabel = preset.label;
+    this.selectedUnlockSabParameterKey = '';
     this.unlockDurationMs = preset.durationMs;
     this.unlockFollowFactor = preset.dampingRatio;
     this.unlockReboundPercent = preset.reboundPercent;
@@ -293,9 +407,51 @@ struct AllConfigPage {
 
   private applyTaskbarDownPreset(preset: TaskbarDownPresetItem): void {
     this.selectedTaskbarDownPresetLabel = preset.label;
+    this.selectedTaskbarDownSabParameterKey = '';
     this.taskbarDownEnterDurationMs = preset.durationMs;
     this.taskbarDownDampingRatio = preset.dampingRatio;
     this.taskbarDownReboundPercent = preset.reboundPercent;
+  }
+
+  private applySabParameter(sceneKey: string, parameter: SabParameterItem): void {
+    if (sceneKey === 'index') {
+      this.selectedIndexPresetLabel = '';
+      this.selectedIndexSabParameterKey = this.sabParameterKey(parameter);
+      this.indexOpenDurationMs = parameter.durationMs;
+      this.indexReboundPercent = parameter.reboundPercent;
+      return;
+    }
+    if (sceneKey === 'volume') {
+      this.selectedVolumePresetLabel = '';
+      this.selectedVolumeSabParameterKey = this.sabParameterKey(parameter);
+      this.volumeDampingRatio = parameter.dampingRatio;
+      this.volumeInteractionPercent = parameter.reboundPercent;
+      this.volumeButtonPercent = parameter.reboundPercent;
+      return;
+    }
+    if (sceneKey === 'taskbarUp') {
+      this.selectedTaskbarUpPresetLabel = '';
+      this.selectedTaskbarUpSabParameterKey = this.sabParameterKey(parameter);
+      this.taskbarUpReleaseDurationMs = parameter.durationMs;
+      this.taskbarUpDampingRatio = parameter.dampingRatio;
+      this.taskbarUpBounceOvershootX = parameter.reboundPercent;
+      return;
+    }
+    if (sceneKey === 'unlock') {
+      this.selectedUnlockPresetLabel = '';
+      this.selectedUnlockSabParameterKey = this.sabParameterKey(parameter);
+      this.unlockDurationMs = parameter.durationMs;
+      this.unlockFollowFactor = parameter.dampingRatio;
+      this.unlockReboundPercent = parameter.reboundPercent;
+      return;
+    }
+    if (sceneKey === 'taskbarDown') {
+      this.selectedTaskbarDownPresetLabel = '';
+      this.selectedTaskbarDownSabParameterKey = this.sabParameterKey(parameter);
+      this.taskbarDownEnterDurationMs = parameter.durationMs;
+      this.taskbarDownDampingRatio = parameter.dampingRatio;
+      this.taskbarDownReboundPercent = parameter.reboundPercent;
+    }
   }
 
   aboutToAppear(): void {
@@ -304,6 +460,11 @@ struct AllConfigPage {
     this.selectedTaskbarUpPresetLabel = this.currentTaskbarUpPresetLabel();
     this.selectedUnlockPresetLabel = this.currentUnlockPresetLabel();
     this.selectedTaskbarDownPresetLabel = this.currentTaskbarDownPresetLabel();
+    this.selectedIndexSabParameterKey = this.selectedIndexPresetLabel.length > 0 ? '' : this.currentIndexSabParameterKey();
+    this.selectedVolumeSabParameterKey = this.selectedVolumePresetLabel.length > 0 ? '' : this.currentVolumeSabParameterKey();
+    this.selectedTaskbarUpSabParameterKey = this.selectedTaskbarUpPresetLabel.length > 0 ? '' : this.currentTaskbarUpSabParameterKey();
+    this.selectedUnlockSabParameterKey = this.selectedUnlockPresetLabel.length > 0 ? '' : this.currentUnlockSabParameterKey();
+    this.selectedTaskbarDownSabParameterKey = this.selectedTaskbarDownPresetLabel.length > 0 ? '' : this.currentTaskbarDownSabParameterKey();
   }
 
   private indexSummary(preset: IndexPresetItem): string {
@@ -344,6 +505,33 @@ struct AllConfigPage {
 
   private taskbarDownParameterText(): string {
     return `时长 ${this.taskbarDownEnterDurationMs}ms / 阻尼 ${this.taskbarDownDampingRatio} / 回弹 ${this.taskbarDownReboundPercent}%`;
+  }
+
+  private sabParameterSummary(parameter: SabParameterItem): string {
+    return formatSabParameterText(parameter);
+  }
+
+  private selectedSabParameterKey(sceneKey: string): string {
+    if (sceneKey === 'index') {
+      return this.selectedIndexSabParameterKey;
+    }
+    if (sceneKey === 'volume') {
+      return this.selectedVolumeSabParameterKey;
+    }
+    if (sceneKey === 'taskbarUp') {
+      return this.selectedTaskbarUpSabParameterKey;
+    }
+    if (sceneKey === 'unlock') {
+      return this.selectedUnlockSabParameterKey;
+    }
+    if (sceneKey === 'taskbarDown') {
+      return this.selectedTaskbarDownSabParameterKey;
+    }
+    return '';
+  }
+
+  private isSabParameterSelected(sceneKey: string, parameter: SabParameterItem): boolean {
+    return this.selectedSabParameterKey(sceneKey) === this.sabParameterKey(parameter);
   }
 
   private openPage(url: string): void {
@@ -555,7 +743,81 @@ struct AllConfigPage {
   }
 
   @Builder
-  private buildPresetDetail(label: string, type: string, parameterText: string) {
+  private buildSabParameterRow(sceneKey: string, parameter: SabParameterItem) {
+    Row() {
+      Column({ space: 2 }) {
+        Text(parameter.mark)
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.isSabParameterSelected(sceneKey, parameter) ? '#101820' : '#FFFFFFFF')
+
+        Text(parameter.name)
+          .fontSize(9)
+          .fontColor(this.isSabParameterSelected(sceneKey, parameter) ? '#80101820' : '#BFFFFFFF')
+      }
+      .width(54)
+      .alignItems(HorizontalAlign.Start)
+
+      Text(this.sabParameterSummary(parameter))
+        .fontSize(11)
+        .fontColor(this.isSabParameterSelected(sceneKey, parameter) ? '#101820' : '#E6FFFFFF')
+        .lineHeight(16)
+        .layoutWeight(1)
+    }
+    .width('100%')
+    .padding({ left: 9, right: 9, top: 5, bottom: 5 })
+    .backgroundColor(this.isSabParameterSelected(sceneKey, parameter) ? '#F2FFFFFF' : '#10FFFFFF')
+    .borderRadius(12)
+    .onClick(() => {
+      this.applySabParameter(sceneKey, parameter);
+    })
+    .gesture(
+      TapGesture({ count: 1 })
+        .onAction(() => {
+          this.applySabParameter(sceneKey, parameter);
+        })
+    )
+  }
+
+  @Builder
+  private buildSabParameterColumn(sceneKey: string, sabParameters: SabParameterItem[]) {
+    Column({ space: 6 }) {
+      Row() {
+        Text('新增参数')
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFFFF')
+
+        Text('S/A/B标')
+          .fontSize(11)
+          .fontColor('#CCFFFFFF')
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+      .alignItems(VerticalAlign.Center)
+
+      ForEach(sabParameters, (parameter: SabParameterItem) => {
+        this.buildSabParameterRow(sceneKey, parameter)
+      }, (parameter: SabParameterItem) => `${parameter.mark}-${parameter.name}`)
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor('#12FFFFFF')
+    .borderRadius(16)
+    .border({
+      width: 1,
+      color: '#1AFFFFFF'
+    })
+  }
+
+  @Builder
+  private buildPresetDetail(
+    label: string,
+    type: string,
+    parameterText: string,
+    sceneKey: string,
+    sabParameters: SabParameterItem[]
+  ) {
     Column({ space: 8 }) {
       Row() {
         Text(label)
@@ -576,6 +838,8 @@ struct AllConfigPage {
         .fontSize(13)
         .fontColor('#F2FFFFFF')
         .lineHeight(20)
+
+      this.buildSabParameterColumn(sceneKey, sabParameters)
     }
     .width('100%')
     .padding(14)
@@ -598,7 +862,7 @@ struct AllConfigPage {
       }
       .width('100%')
 
-      this.buildPresetDetail(this.activeIndexPresetLabel(), this.activeIndexPresetType(), this.indexParameterText())
+      this.buildPresetDetail(this.activeIndexPresetLabel(), this.activeIndexPresetType(), this.indexParameterText(), 'index', this.indexSabParameters)
     }
     .width('100%')
     .padding(16)
@@ -622,7 +886,7 @@ struct AllConfigPage {
       }
       .width('100%')
 
-      this.buildPresetDetail(this.activeVolumePresetLabel(), this.activeVolumePresetType(), this.volumeParameterText())
+      this.buildPresetDetail(this.activeVolumePresetLabel(), this.activeVolumePresetType(), this.volumeParameterText(), 'volume', this.volumeSabParameters)
     }
     .width('100%')
     .padding(16)
@@ -646,7 +910,7 @@ struct AllConfigPage {
       }
       .width('100%')
 
-      this.buildPresetDetail(this.activeTaskbarUpPresetLabel(), this.activeTaskbarUpPresetType(), this.taskbarUpParameterText())
+      this.buildPresetDetail(this.activeTaskbarUpPresetLabel(), this.activeTaskbarUpPresetType(), this.taskbarUpParameterText(), 'taskbarUp', this.taskbarUpSabParameters)
     }
     .width('100%')
     .padding(16)
@@ -670,7 +934,7 @@ struct AllConfigPage {
       }
       .width('100%')
 
-      this.buildPresetDetail(this.activeUnlockPresetLabel(), this.activeUnlockPresetType(), this.unlockParameterText())
+      this.buildPresetDetail(this.activeUnlockPresetLabel(), this.activeUnlockPresetType(), this.unlockParameterText(), 'unlock', this.unlockSabParameters)
     }
     .width('100%')
     .padding(16)
@@ -694,7 +958,7 @@ struct AllConfigPage {
       }
       .width('100%')
 
-      this.buildPresetDetail(this.activeTaskbarDownPresetLabel(), this.activeTaskbarDownPresetType(), this.taskbarDownParameterText())
+      this.buildPresetDetail(this.activeTaskbarDownPresetLabel(), this.activeTaskbarDownPresetType(), this.taskbarDownParameterText(), 'taskbarDown', this.taskbarDownSabParameters)
     }
     .width('100%')
     .padding(16)

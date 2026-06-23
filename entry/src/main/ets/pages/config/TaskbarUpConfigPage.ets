@@ -1,4 +1,10 @@
-import { TASKBAR_UP_PRESETS, TaskbarUpPresetItem } from './ExperimentPresetData';
+import {
+  TASKBAR_UP_PRESETS,
+  TASKBAR_UP_SAB_PARAMETERS,
+  SabParameterItem,
+  TaskbarUpPresetItem,
+  formatSabParameterText
+} from './ExperimentPresetData';
 
 interface TaskbarUpPreviewRouteOptions {
   url: string;
@@ -11,6 +17,7 @@ struct TaskbarUpConfigPage {
   @StorageLink('taskbarUpLeadCardReleaseDurationMs') leadCardReleaseDurationMs: number = 1000;
   @StorageLink('taskbarUpCardBounceOvershootX') cardBounceOvershootX: number = 5;
   @State selectedPresetLabel: string = '';
+  @State selectedSabParameterKey: string = '';
 
   private readonly PAGE_HORIZONTAL_PADDING: number = 20;
   private readonly PAGE_VERTICAL_PADDING: number = 28;
@@ -20,6 +27,7 @@ struct TaskbarUpConfigPage {
   private readonly PRESET_HEIGHT: number = 34;
   private readonly PRESET_BUTTON_WIDTH: number = 42;
   private readonly presets: TaskbarUpPresetItem[] = TASKBAR_UP_PRESETS;
+  private readonly sabParameters: SabParameterItem[] = TASKBAR_UP_SAB_PARAMETERS;
 
   private isSelected(current: number, value: number): boolean {
     return Math.abs(current - value) < 0.001;
@@ -45,6 +53,32 @@ struct TaskbarUpConfigPage {
       }
     }
     return '';
+  }
+
+  private sabParameterKey(parameter: SabParameterItem): string {
+    return `${parameter.mark}-${parameter.name}`;
+  }
+
+  private sabParameterMatchesCurrentValue(parameter: SabParameterItem): boolean {
+    return this.isSelected(this.leadCardReleaseDurationMs, parameter.durationMs)
+      && this.isSelected(this.upSwipeDampingRatio, parameter.dampingRatio)
+      && this.isSelected(this.cardBounceOvershootX, parameter.reboundPercent);
+  }
+
+  private currentSabParameterKey(): string {
+    for (let index = 0; index < this.sabParameters.length; index += 1) {
+      if (this.sabParameterMatchesCurrentValue(this.sabParameters[index])) {
+        return this.sabParameterKey(this.sabParameters[index]);
+      }
+    }
+    return '';
+  }
+
+  private isSabParameterSelected(parameter: SabParameterItem): boolean {
+    if (this.selectedSabParameterKey.length > 0) {
+      return this.selectedSabParameterKey === this.sabParameterKey(parameter);
+    }
+    return this.selectedPresetLabel.length === 0 && this.sabParameterMatchesCurrentValue(parameter);
   }
 
   private activePresetLabel(): string {
@@ -76,15 +110,29 @@ struct TaskbarUpConfigPage {
     return `时长 ${this.leadCardReleaseDurationMs}ms / 阻尼 ${this.upSwipeDampingRatio} / 回弹 ${this.cardBounceOvershootX}%`;
   }
 
+  private sabParameterSummary(parameter: SabParameterItem): string {
+    return formatSabParameterText(parameter);
+  }
+
   private applyPreset(preset: TaskbarUpPresetItem): void {
     this.selectedPresetLabel = preset.label;
+    this.selectedSabParameterKey = '';
     this.leadCardReleaseDurationMs = preset.durationMs;
     this.upSwipeDampingRatio = preset.dampingRatio;
     this.cardBounceOvershootX = preset.reboundPercent;
   }
 
+  private applySabParameter(parameter: SabParameterItem): void {
+    this.selectedPresetLabel = '';
+    this.selectedSabParameterKey = this.sabParameterKey(parameter);
+    this.leadCardReleaseDurationMs = parameter.durationMs;
+    this.upSwipeDampingRatio = parameter.dampingRatio;
+    this.cardBounceOvershootX = parameter.reboundPercent;
+  }
+
   aboutToAppear(): void {
     this.selectedPresetLabel = this.currentPresetLabel();
+    this.selectedSabParameterKey = this.selectedPresetLabel.length > 0 ? '' : this.currentSabParameterKey();
   }
 
   private openPreviewPage(): void {
@@ -192,6 +240,74 @@ struct TaskbarUpConfigPage {
   }
 
   @Builder
+  private buildSabParameterRow(parameter: SabParameterItem) {
+    Row() {
+      Column({ space: 2 }) {
+        Text(parameter.mark)
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.isSabParameterSelected(parameter) ? '#101820' : '#FFFFFFFF')
+
+        Text(parameter.name)
+          .fontSize(10)
+          .fontColor(this.isSabParameterSelected(parameter) ? '#80101820' : '#BFFFFFFF')
+      }
+      .width(58)
+      .alignItems(HorizontalAlign.Start)
+
+      Text(this.sabParameterSummary(parameter))
+        .fontSize(12)
+        .fontColor(this.isSabParameterSelected(parameter) ? '#101820' : '#E6FFFFFF')
+        .lineHeight(17)
+        .layoutWeight(1)
+    }
+    .width('100%')
+    .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+    .backgroundColor(this.isSabParameterSelected(parameter) ? '#F2FFFFFF' : '#12FFFFFF')
+    .borderRadius(14)
+    .onClick(() => {
+      this.applySabParameter(parameter);
+    })
+    .gesture(
+      TapGesture({ count: 1 })
+        .onAction(() => {
+          this.applySabParameter(parameter);
+        })
+    )
+  }
+
+  @Builder
+  private buildSabParameterColumn() {
+    Column({ space: 7 }) {
+      Row() {
+        Text('新增参数')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFFFF')
+
+        Text('S/A/B标')
+          .fontSize(12)
+          .fontColor('#CCFFFFFF')
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+      .alignItems(VerticalAlign.Center)
+
+      ForEach(this.sabParameters, (parameter: SabParameterItem) => {
+        this.buildSabParameterRow(parameter)
+      }, (parameter: SabParameterItem) => `${parameter.mark}-${parameter.name}`)
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor('#16FFFFFF')
+    .borderRadius(20)
+    .border({
+      width: 1,
+      color: '#1FFFFFFF'
+    })
+  }
+
+  @Builder
   private buildPreviewButton() {
     Stack() {
       Text('进入预览')
@@ -246,25 +362,31 @@ struct TaskbarUpConfigPage {
         )
 
       Column() {
-        Column({ space: 24 }) {
-          this.buildHeader()
-          this.buildPresetList()
-          this.buildPresetDetail()
-          this.buildPreviewButton()
+        Scroll() {
+          Column({ space: 24 }) {
+            this.buildHeader()
+            this.buildPresetList()
+            this.buildPresetDetail()
+            this.buildSabParameterColumn()
+            this.buildPreviewButton()
+          }
+          .width('100%')
+          .padding(this.PANEL_PADDING)
+          .backgroundColor('#33212730')
+          .backdropBlur(30)
+          .borderRadius(this.PANEL_RADIUS)
+          .border({
+            width: 1,
+            color: '#26FFFFFF'
+          })
         }
         .width('100%')
-        .padding(this.PANEL_PADDING)
-        .backgroundColor('#33212730')
-        .backdropBlur(30)
-        .borderRadius(this.PANEL_RADIUS)
-        .border({
-          width: 1,
-          color: '#26FFFFFF'
-        })
+        .height('100%')
+        .scrollable(ScrollDirection.Vertical)
+        .scrollBar(BarState.Off)
       }
       .width('100%')
       .height('100%')
-      .justifyContent(FlexAlign.Center)
       .padding({
         left: this.PAGE_HORIZONTAL_PADDING,
         right: this.PAGE_HORIZONTAL_PADDING,
