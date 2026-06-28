@@ -19,6 +19,7 @@ function loadHelper() {
     .replace(/\): [A-Za-z0-9_]+ \{/g, ') {')
     .replace(/([A-Za-z0-9_]+): number/g, '$1')
     .replace(/([A-Za-z0-9_]+): boolean/g, '$1')
+    .replace(/: TaskbarUpCardSwipeDeformation/g, '')
     .replace(/: TaskbarUpReleaseDurations/g, '');
 
   const context = {};
@@ -30,7 +31,8 @@ this.taskbarUpReleaseEaseIn = taskbarUpReleaseEaseIn;
 this.taskbarUpReleaseForwardControlY = taskbarUpReleaseForwardControlY;
 this.taskbarUpReleaseInitialSlope = taskbarUpReleaseInitialSlope;
 this.taskbarUpFollowerReleaseMultiplier = taskbarUpFollowerReleaseMultiplier;
-this.taskbarUpFollowerReleaseTranslateX = taskbarUpFollowerReleaseTranslateX;`, context);
+this.taskbarUpFollowerReleaseTranslateX = taskbarUpFollowerReleaseTranslateX;
+this.taskbarUpCardSwipeDeformation = taskbarUpCardSwipeDeformation;`, context);
   return context;
 }
 
@@ -41,7 +43,8 @@ const {
   taskbarUpReleaseForwardControlY,
   taskbarUpReleaseInitialSlope,
   taskbarUpFollowerReleaseMultiplier,
-  taskbarUpFollowerReleaseTranslateX
+  taskbarUpFollowerReleaseTranslateX,
+  taskbarUpCardSwipeDeformation
 } = loadHelper();
 
 function assertAlmostEqual(actual, expected) {
@@ -121,6 +124,48 @@ assert.equal(
   0
 );
 
+const neutralSwipe = taskbarUpCardSwipeDeformation(0, 234, 260, 0);
+assert.equal(neutralSwipe.rotateYDeg, 0);
+assert.equal(neutralSwipe.skewXDeg, 0);
+assert.equal(neutralSwipe.scaleX, 1);
+assert.equal(neutralSwipe.scaleY, 1);
+assert.equal(neutralSwipe.highlightOpacity, 0);
+assert.equal(neutralSwipe.shadowOpacity, 0);
+assert.equal(neutralSwipe.edgeRadiusOffset, 0);
+
+const rightSwipe = taskbarUpCardSwipeDeformation(117, 234, 260, 0.05);
+const leftSwipe = taskbarUpCardSwipeDeformation(-117, 234, 260, -0.05);
+assert.ok(rightSwipe.rotateYDeg < 0, 'right drag should tip cards toward the drag direction');
+assert.ok(Math.abs(rightSwipe.rotateYDeg) >= 22, 'medium drag should create a stronger visible card bend');
+assert.equal(leftSwipe.rotateYDeg, -rightSwipe.rotateYDeg);
+assert.equal(rightSwipe.skewXDeg, 0, 'horizontal deformation should not tilt the top/bottom edges');
+assert.equal(leftSwipe.skewXDeg, 0, 'horizontal deformation should not tilt the top/bottom edges');
+assert.ok(rightSwipe.scaleX > 1, 'right drag should stretch the card horizontally');
+assert.ok(rightSwipe.scaleX >= 1.06, 'medium right drag should make the right side visibly extend');
+assert.equal(rightSwipe.scaleY, 1, 'right drag should not create vertical top/bottom deformation');
+assert.equal(leftSwipe.scaleY, 1, 'left drag should not create vertical top/bottom deformation');
+assert.equal(leftSwipe.scaleX, rightSwipe.scaleX);
+assert.ok(rightSwipe.originXPercent <= 8, 'right drag should pin the left side so the right edge deforms');
+assert.ok(leftSwipe.originXPercent >= 92, 'left drag should pin the right side so the left edge deforms');
+assert.ok(rightSwipe.highlightOpacity > 0);
+assert.ok(rightSwipe.highlightOpacity >= 0.2, 'medium drag should show stronger light feedback');
+assert.equal(rightSwipe.shadowOpacity, 0, 'moving black side shadow should be disabled');
+assert.equal(leftSwipe.highlightOpacity, rightSwipe.highlightOpacity);
+assert.ok(rightSwipe.highlightOffsetX < 0);
+assert.ok(leftSwipe.highlightOffsetX > 0);
+
+const clampedSwipe = taskbarUpCardSwipeDeformation(2000, 234, 260, 8);
+assert.ok(Math.abs(clampedSwipe.rotateYDeg) >= 32);
+assert.ok(Math.abs(clampedSwipe.rotateYDeg) <= 38);
+assert.equal(clampedSwipe.skewXDeg, 0);
+assert.ok(clampedSwipe.scaleX >= 1.1);
+assert.ok(clampedSwipe.scaleX <= 1.13);
+assert.equal(clampedSwipe.scaleY, 1);
+assert.ok(clampedSwipe.edgeRadiusOffset >= 14);
+assert.ok(clampedSwipe.edgeRadiusOffset <= 16);
+assert.ok(Math.abs(clampedSwipe.materialTranslateX) >= 18);
+assert.equal(clampedSwipe.shadowOpacity, 0);
+
 const pageSource = fs.readFileSync(pagePath, 'utf8');
 assert.ok(
   !pageSource.includes('LEAD_CARD_RELEASE_FRAME_MS'),
@@ -130,3 +175,69 @@ assert.ok(
   !pageSource.includes('runLeadCardReleaseSegment'),
   'release motion should stay on the framework animation clock'
 );
+assert.ok(
+  pageSource.includes('taskbarUpCardSwipeDeformation'),
+  'TaskbarUpPage should drive horizontal card deformation with the shared helper'
+);
+assert.ok(
+  pageSource.includes('.rotate({') && pageSource.includes('swipeDeformation'),
+  'TaskbarUpPage should apply a 3D rotation while cards are dragged horizontally'
+);
+assert.ok(
+  pageSource.includes('swipeHighlightOpacity'),
+  'TaskbarUpPage should render swipe highlight/shadow feedback from the deformation'
+);
+assert.ok(
+  !pageSource.includes('buildLeftCardPane') && !pageSource.includes('buildRightCardPane'),
+  'TaskbarUpPage should keep each card image continuous instead of splitting it into visible panes'
+);
+assert.ok(
+  !pageSource.includes('leftPaneScale') && !pageSource.includes('rightPaneScale'),
+  'card side deformation should come from perspective and origin shifts, not hard image splitting'
+);
+assert.ok(
+  pageSource.includes('Image(this.cardImage(index))') && pageSource.includes('.transform3D(this.swipeTransform3D(index))'),
+  'TaskbarUpPage should keep one continuous card image and apply a visible 3D matrix bend'
+);
+assert.ok(
+  pageSource.includes("import matrix4 from '@ohos.matrix4';"),
+  'TaskbarUpPage should use ArkUI matrix4 for visible horizontal deformation'
+);
+assert.ok(
+  pageSource.includes('swipeTransform3D') && pageSource.includes('.transform3D('),
+  'TaskbarUpPage should apply a 3D matrix transform instead of relying only on scale'
+);
+assert.ok(
+  pageSource.includes('matrix4.identity()') && pageSource.includes('.rotate({'),
+  'TaskbarUpPage should use matrix rotation for directional horizontal deformation'
+);
+assert.ok(
+  pageSource.includes('.rotate({') && pageSource.includes('centerX: this.swipeMatrixCenterX(index)'),
+  'TaskbarUpPage should rotate through the matrix transform around a drag-dependent center'
+);
+assert.ok(
+  pageSource.includes('this.swipeScaleX(index)') && pageSource.includes('centerX: this.swipeOriginX(index)'),
+  'TaskbarUpPage should apply horizontal scale from a side anchor so the right/left edge visibly deforms'
+);
+assert.ok(
+  !pageSource.includes('CARD_SWIPE_SHADOW_WIDTH') && !pageSource.includes('swipeShadowOpacity'),
+  'TaskbarUpPage should remove the hard moving black side shadow'
+);
+assert.ok(
+  !pageSource.includes('#FF000000'),
+  'TaskbarUpPage should not render a hard black swipe shadow block'
+);
+assert.ok(
+  !/private buildCard\(index: number\) \{\s*const /m.test(pageSource),
+  'ArkUI @Builder bodies should start with component syntax, not local const declarations'
+);
+assert.ok(
+  !pageSource.includes('.skew('),
+  'TaskbarUpPage should avoid skew because the requested deformation is left/right, not top/bottom'
+);
+const pageMaxOffset = pageSource.match(/CARD_SWIPE_DEFORM_MAX_OFFSET: number = ([0-9.]+)/);
+const pageEdgeRatio = pageSource.match(/CARD_SWIPE_EDGE_DEFORM_RATIO: number = ([0-9.]+)/);
+assert.ok(pageMaxOffset, 'TaskbarUpPage should expose horizontal deformation travel');
+assert.ok(Number(pageMaxOffset[1]) <= 200, 'horizontal swipe deformation should respond faster to the same drag');
+assert.ok(pageEdgeRatio, 'TaskbarUpPage should expose edge pull deformation ratio');
+assert.ok(Number(pageEdgeRatio[1]) >= 0.3, 'edge pull should produce a more visible deformation');

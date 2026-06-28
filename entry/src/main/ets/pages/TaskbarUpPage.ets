@@ -1,5 +1,8 @@
 import curves from '@ohos.curves';
+import matrix4 from '@ohos.matrix4';
 import {
+  TaskbarUpCardSwipeDeformation,
+  taskbarUpCardSwipeDeformation,
   taskbarUpFollowerReleaseMultiplier,
   taskbarUpFollowerReleaseTranslateX,
   taskbarUpReleaseDurations,
@@ -19,6 +22,7 @@ struct TaskbarUpPage {
   @State pressedCardIndex: number = -1;
   @State edgeSnapOffsetX: number = 0;
   @State edgeDragRawOffsetX: number = 0;
+  @State cardSwipeVisualOffsetX: number = 0;
   @State draggingVertical: boolean = false;
   @State leadCardReleaseProgress: number = 0;
   @State leadCardReleaseScaleValue: number = 1;
@@ -131,6 +135,12 @@ struct TaskbarUpPage {
   private readonly INITIAL_WAKE_SNAP_DELAY_MS: number = 36;
   private readonly EDGE_DRAG_FOLLOW_RATIO: number = 0.72;
   private readonly EDGE_DRAG_MAX_OFFSET: number = 1912;
+  private readonly CARD_SWIPE_DEFORM_MAX_OFFSET: number = 190;
+  private readonly CARD_SWIPE_DEFORM_MEMORY: number = 0.78;
+  private readonly CARD_SWIPE_DEFORM_RELEASE_DURATION_MS: number = 520;
+  private readonly CARD_SWIPE_DEFORM_NEIGHBOR_FALLOFF: number = 0.08;
+  private readonly CARD_SWIPE_EDGE_DEFORM_RATIO: number = 0.3;
+  private readonly CARD_SWIPE_HIGHLIGHT_WIDTH: number = 92;
   private readonly BLANK_TAP_MOVE_TOLERANCE: number = 22;
   private readonly CARD_BLANK_TAP_HIT_SLOP: number = 10;
   private readonly CARD_PRESS_SCALE: number = 1.02;
@@ -305,6 +315,115 @@ struct TaskbarUpPage {
 
   private rowTranslateX(): number {
     return this.edgeSnapOffsetX + this.edgeDragVisualOffsetX();
+  }
+
+  private clampCardSwipeVisualOffset(value: number): number {
+    return this.clamp(
+      value,
+      -this.CARD_SWIPE_DEFORM_MAX_OFFSET,
+      this.CARD_SWIPE_DEFORM_MAX_OFFSET
+    );
+  }
+
+  private trackCardSwipeDeformation(deltaX: number): void {
+    if (!this.expanded || this.animating || Math.abs(deltaX) < 0.01) {
+      return;
+    }
+
+    const nextOffset = this.cardSwipeVisualOffsetX * this.CARD_SWIPE_DEFORM_MEMORY + deltaX;
+    this.cardSwipeVisualOffsetX = this.clampCardSwipeVisualOffset(nextOffset);
+  }
+
+  private releaseCardSwipeDeformation(): void {
+    if (Math.abs(this.cardSwipeVisualOffsetX) < 0.01) {
+      this.cardSwipeVisualOffsetX = 0;
+      return;
+    }
+
+    this.getUIContext().animateTo({
+      duration: this.CARD_SWIPE_DEFORM_RELEASE_DURATION_MS,
+      curve: curves.cubicBezierCurve(0.18, 0.88, 0.2, 1)
+    }, () => {
+      this.cardSwipeVisualOffsetX = 0;
+    });
+  }
+
+  private swipeDeformation(index: number): TaskbarUpCardSwipeDeformation {
+    const focusedIndex = this.nearestCardIndex(this.cardScroller.currentOffset().xOffset);
+    const distanceFromFocus = Math.abs(index - focusedIndex);
+    const focusMultiplier = this.clamp(
+      1 - distanceFromFocus * this.CARD_SWIPE_DEFORM_NEIGHBOR_FALLOFF,
+      0.72,
+      1
+    );
+    const openMultiplier = this.clamp((this.openProgress - 0.55) / 0.45, 0, 1);
+    const edgePull = this.edgeDragVisualOffsetX() * this.CARD_SWIPE_EDGE_DEFORM_RATIO;
+    const visualOffsetX = (this.cardSwipeVisualOffsetX + edgePull) * focusMultiplier * openMultiplier;
+
+    return taskbarUpCardSwipeDeformation(
+      visualOffsetX,
+      this.CARD_WIDTH,
+      this.CARD_SWIPE_DEFORM_MAX_OFFSET
+    );
+  }
+
+  private swipeCardRadius(index: number): number {
+    return Math.max(this.CARD_RADIUS - this.swipeDeformation(index).edgeRadiusOffset, 24);
+  }
+
+  private swipeHighlightOpacity(index: number): number {
+    return this.swipeDeformation(index).highlightOpacity;
+  }
+
+  private swipeHighlightLeft(index: number): number {
+    const swipeDeformation = this.swipeDeformation(index);
+    if (swipeDeformation.highlightOffsetX < 0) {
+      return swipeDeformation.highlightOffsetX;
+    }
+    if (swipeDeformation.highlightOffsetX > 0) {
+      return this.CARD_WIDTH - this.CARD_SWIPE_HIGHLIGHT_WIDTH + swipeDeformation.highlightOffsetX;
+    }
+    return -this.CARD_SWIPE_HIGHLIGHT_WIDTH;
+  }
+
+  private swipeMaterialTranslateX(index: number): number {
+    return this.swipeDeformation(index).materialTranslateX;
+  }
+
+  private swipeMaterialTranslateY(index: number): number {
+    return this.swipeDeformation(index).materialTranslateY;
+  }
+
+  private swipeScaleX(index: number): number {
+    return this.swipeDeformation(index).scaleX;
+  }
+
+  private swipeScaleY(index: number): number {
+    return this.swipeDeformation(index).scaleY;
+  }
+
+  private swipeOriginX(index: number): string {
+    return `${this.swipeDeformation(index).originXPercent}%`;
+  }
+
+  private swipeRotateY(index: number): number {
+    return this.swipeDeformation(index).rotateYDeg;
+  }
+
+  private swipeMatrixCenterX(index: number): number {
+    return (this.swipeDeformation(index).originXPercent - 50) * this.CARD_WIDTH / 100;
+  }
+
+  private swipeTransform3D(index: number): matrix4.Matrix4Transit {
+    return matrix4.identity()
+      .rotate({
+        x: 0,
+        y: 1,
+        z: 0,
+        angle: this.swipeRotateY(index),
+        centerX: this.swipeMatrixCenterX(index),
+        centerY: 0
+      });
   }
 
   private fullFrameWidth(): number {
@@ -743,6 +862,10 @@ struct TaskbarUpPage {
     yOffset: number,
     scrollSource: ScrollSource
   ): OffsetResult | void {
+    if (!this.trackingEdgeTouch && (scrollSource === ScrollSource.DRAG || scrollSource === ScrollSource.SCROLL_BAR)) {
+      this.trackCardSwipeDeformation(-xOffset);
+    }
+
     if (scrollSource !== ScrollSource.DRAG && scrollSource !== ScrollSource.SCROLL_BAR) {
       return;
     }
@@ -907,6 +1030,7 @@ struct TaskbarUpPage {
       this.lastTouchWindowX = touchX;
       this.rowTouchStartWindowX = touchX;
       this.rowTouchStartWindowY = touchY;
+      this.cardSwipeVisualOffsetX = 0;
       return;
     }
 
@@ -916,6 +1040,7 @@ struct TaskbarUpPage {
       }
       const deltaX = touchX - this.lastTouchWindowX;
       this.lastTouchWindowX = touchX;
+      this.trackCardSwipeDeformation(deltaX);
       this.handleEdgeDragMove(deltaX);
       return;
     }
@@ -924,6 +1049,7 @@ struct TaskbarUpPage {
       const closedByBlankTap = event.type === TouchType.Up && this.maybeCloseFromBlankRowTap(event);
       this.trackingEdgeTouch = false;
       if (!closedByBlankTap) {
+        this.releaseCardSwipeDeformation();
         this.releaseEdgeDragOffset();
       }
     }
@@ -983,6 +1109,7 @@ struct TaskbarUpPage {
     }
     this.edgeSnapOffsetX = 0;
     this.edgeDragRawOffsetX = 0;
+    this.cardSwipeVisualOffsetX = 0;
     this.cardScroller.scrollTo({
       xOffset: this.centeredOffsetForIndex(this.INITIAL_CENTER_INDEX),
       yOffset: 0,
@@ -1088,6 +1215,7 @@ struct TaskbarUpPage {
       this.reboundAnimationToken += 1;
       this.edgeSnapOffsetX = 0;
       this.edgeDragRawOffsetX = 0;
+      this.cardSwipeVisualOffsetX = 0;
       this.leadCardReleaseProgress = 0;
       this.leadCardReleaseScaleValue = 1;
       this.leadCardTranslateAtRelease = 0;
@@ -1186,6 +1314,7 @@ struct TaskbarUpPage {
       if (nextProgress <= 0.001) {
         this.edgeSnapOffsetX = 0;
         this.edgeDragRawOffsetX = 0;
+        this.cardSwipeVisualOffsetX = 0;
       }
       return;
     }
@@ -1261,11 +1390,27 @@ struct TaskbarUpPage {
           .width(this.CARD_WIDTH)
           .height(this.CARD_HEIGHT)
           .objectFit(ImageFit.Cover)
-          .borderRadius(this.CARD_RADIUS)
+          .borderRadius(this.swipeCardRadius(index))
           .clip(true)
+
+        Column()
+          .width(this.CARD_SWIPE_HIGHLIGHT_WIDTH)
+          .height(this.CARD_HEIGHT)
+          .backgroundColor('#FFFFFFFF')
+          .opacity(this.swipeHighlightOpacity(index))
+          .position({
+            x: this.swipeHighlightLeft(index),
+            y: 0
+          })
       }
       .width(this.CARD_WIDTH)
       .height(this.CARD_HEIGHT)
+      .borderRadius(this.swipeCardRadius(index))
+      .clip(true)
+      .translate({
+        x: this.swipeMaterialTranslateX(index),
+        y: this.swipeMaterialTranslateY(index)
+      })
       .position({
         x: 0,
         y: this.cardImageTop()
@@ -1299,9 +1444,12 @@ struct TaskbarUpPage {
     .clip(false)
     .zIndex(this.cardZIndex(index))
     .scale({
-      x: this.cardScale(index) * this.cardPressScale(index),
-      y: this.cardScale(index) * this.cardPressScale(index)
+      x: this.cardScale(index) * this.cardPressScale(index) * this.swipeScaleX(index),
+      y: this.cardScale(index) * this.cardPressScale(index) * this.swipeScaleY(index),
+      centerX: this.swipeOriginX(index),
+      centerY: '50%'
     })
+    .transform3D(this.swipeTransform3D(index))
     .translate({
       x: this.cardTranslateX(index),
       y: this.cardTranslateY(index)
@@ -1427,6 +1575,7 @@ struct TaskbarUpPage {
       })
       .onScrollStop(() => {
         if (this.expanded) {
+          this.releaseCardSwipeDeformation();
           this.releaseEdgeDragOffset();
           this.snapToNearestCard();
         }

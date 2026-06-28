@@ -215,41 +215,41 @@ export const INDEX_PRESETS: IndexPresetItem[] = [
 ];
 
 export const TASKBAR_UP_SAB_PARAMETERS: SabParameterItem[] = [
-  { mark: 'S标', name: '基准参数', duration: '1015ms', rebound: '4%', damping: '1', durationMs: 1015, reboundPercent: 4, dampingRatio: 1 },
-  { mark: 'A标', name: '参数1', duration: '980ms', rebound: '5%', damping: '0.8', durationMs: 980, reboundPercent: 5, dampingRatio: 0.8 },
-  { mark: 'A标', name: '参数2', duration: '1050ms', rebound: '3%', damping: '1.2', durationMs: 1050, reboundPercent: 3, dampingRatio: 1.2 },
-  { mark: 'B标', name: '参数1', duration: '1600ms', rebound: '8%', damping: '1.5', durationMs: 1600, reboundPercent: 8, dampingRatio: 1.5 },
-  { mark: 'B标', name: '参数2', duration: '1800ms', rebound: '10%', damping: '1.5', durationMs: 1800, reboundPercent: 10, dampingRatio: 1.5 }
+  { mark: 'S标', name: '基准参数', duration: '900ms', rebound: '5%', damping: '1', durationMs: 900, reboundPercent: 5, dampingRatio: 1 },
+  { mark: 'A标', name: '参数1', duration: '750ms', rebound: '0.8%', damping: '0.7', durationMs: 750, reboundPercent: 0.8, dampingRatio: 0.7 },
+  { mark: 'A标', name: '参数2', duration: '1180ms', rebound: '7%', damping: '0.75', durationMs: 1180, reboundPercent: 7, dampingRatio: 0.75 },
+  { mark: 'B标', name: '参数1', duration: '500ms', rebound: '8%', damping: '1.5', durationMs: 500, reboundPercent: 8, dampingRatio: 1.5 },
+  { mark: 'B标', name: '参数2', duration: '1500ms', rebound: '10%', damping: '0.3', durationMs: 1500, reboundPercent: 10, dampingRatio: 0.3 }
 ];
 
 export const VOLUME_SAB_PARAMETERS: SabParameterItem[] = [
-  { mark: 'S标', name: '基准参数', duration: '默认', rebound: '14.9%', damping: '0.9', durationMs: 0, reboundPercent: 14.9, dampingRatio: 0.9 },
-  { mark: 'A标', name: '参数1', duration: '默认', rebound: '14.9%', damping: '0.7', durationMs: 0, reboundPercent: 14.9, dampingRatio: 0.7 },
-  { mark: 'A标', name: '参数2', duration: '默认', rebound: '14.9%', damping: '1.2', durationMs: 0, reboundPercent: 14.9, dampingRatio: 1.2 },
-  { mark: 'B标', name: '参数1', duration: '默认', rebound: '14.9%', damping: '0.5', durationMs: 0, reboundPercent: 14.9, dampingRatio: 0.5 },
-  { mark: 'B标', name: '参数2', duration: '默认', rebound: '14.9%', damping: '0.4', durationMs: 0, reboundPercent: 14.9, dampingRatio: 0.4 }
+  { mark: 'S标', name: '基准参数', duration: '默认', rebound: '17.65%', damping: '1.08', durationMs: 0, reboundPercent: 17.65, dampingRatio: 1.08 },
+  { mark: 'A标', name: '参数1', duration: '默认', rebound: '9%', damping: '0.9', durationMs: 0, reboundPercent: 9, dampingRatio: 0.9 },
+  { mark: 'A标', name: '参数2', duration: '默认', rebound: '12%', damping: '1.2', durationMs: 0, reboundPercent: 12, dampingRatio: 1.2 },
+  { mark: 'B标', name: '参数1', duration: '默认', rebound: '14.9%', damping: '0.6', durationMs: 0, reboundPercent: 14.9, dampingRatio: 0.6 },
+  { mark: 'B标', name: '参数2', duration: '默认', rebound: '14.9%', damping: '1.5', durationMs: 0, reboundPercent: 14.9, dampingRatio: 1.5 }
 ];
 
 export const TASKBAR_DOWN_SAB_PARAMETERS: SabParameterItem[] = [
-  { mark: 'S标', name: '基准参数', duration: '934ms', rebound: '0%', damping: '1.5', durationMs: 934, reboundPercent: 0, dampingRatio: 1.5 },
-  { mark: 'A标', name: '参数1', duration: '818ms', rebound: '5%', damping: '0.7', durationMs: 818, reboundPercent: 5, dampingRatio: 0.7 },
-  { mark: 'A标', name: '参数2', duration: '1071ms', rebound: '1%', damping: '1.5', durationMs: 1071, reboundPercent: 1, dampingRatio: 1.5 },
-  { mark: 'B标', name: '参数1', duration: '500ms', rebound: '12%', damping: '0.8', durationMs: 500, reboundPercent: 12, dampingRatio: 0.8 },
-  { mark: 'B标', name: '参数2', duration: '700ms', rebound: '15%', damping: '0.8', durationMs: 700, reboundPercent: 15, dampingRatio: 0.8 }
+  { mark: 'S标', name: '基准参数', duration: '1000ms', rebound: '0%', damping: '0.5', durationMs: 1000, reboundPercent: 0, dampingRatio: 0.5 },
+  { mark: 'A标', name: '参数1', duration: '650ms', rebound: '2%', damping: '0.8', durationMs: 650, reboundPercent: 2, dampingRatio: 0.8 },
+  { mark: 'A标', name: '参数2', duration: '1450ms', rebound: '1%', damping: '1.2', durationMs: 1450, reboundPercent: 1, dampingRatio: 1.2 },
+  { mark: 'B标', name: '参数1', duration: '400ms', rebound: '3%', damping: '0.8', durationMs: 400, reboundPercent: 3, dampingRatio: 0.8 },
+  { mark: 'B标', name: '参数2', duration: '550ms', rebound: '6%', damping: '0.8', durationMs: 550, reboundPercent: 6, dampingRatio: 0.8 }
 ];
 
 export const UNLOCK_DESKTOP_SAB_PARAMETERS: SabParameterItem[] = [
-  { mark: 'S标', name: '基准参数', duration: '587ms', rebound: '8.6%', damping: '0.5', durationMs: 587, reboundPercent: 8.6, dampingRatio: 0.5 },
-  { mark: 'A标', name: '参数1', duration: '350ms', rebound: '3.5%', damping: '0.3', durationMs: 350, reboundPercent: 3.5, dampingRatio: 0.3 },
-  { mark: 'A标', name: '参数2', duration: '750ms', rebound: '12%', damping: '1.2', durationMs: 750, reboundPercent: 12, dampingRatio: 1.2 },
-  { mark: 'B标', name: '参数1', duration: '900ms', rebound: '15%', damping: '1.4', durationMs: 900, reboundPercent: 15, dampingRatio: 1.4 },
-  { mark: 'B标', name: '参数2', duration: '1100ms', rebound: '16%', damping: '1.6', durationMs: 1100, reboundPercent: 16, dampingRatio: 1.6 }
+  { mark: 'S标', name: '基准参数', duration: '300ms', rebound: '13.42%', damping: '0.3', durationMs: 300, reboundPercent: 13.42, dampingRatio: 0.3 },
+  { mark: 'A标', name: '参数1', duration: '630ms', rebound: '4.5%', damping: '0.6', durationMs: 630, reboundPercent: 4.5, dampingRatio: 0.6 },
+  { mark: 'A标', name: '参数2', duration: '750ms', rebound: '6.5%', damping: '0.9', durationMs: 750, reboundPercent: 6.5, dampingRatio: 0.9 },
+  { mark: 'B标', name: '参数1', duration: '800ms', rebound: '3.5%', damping: '0.9', durationMs: 800, reboundPercent: 3.5, dampingRatio: 0.9 },
+  { mark: 'B标', name: '参数2', duration: '890ms', rebound: '4.5%', damping: '1', durationMs: 890, reboundPercent: 4.5, dampingRatio: 1 }
 ];
 
 export const INDEX_SAB_PARAMETERS: SabParameterItem[] = [
-  { mark: 'S标', name: '基准参数', duration: '246ms', rebound: '13.8%', damping: '不适用', durationMs: 246, reboundPercent: 13.8, dampingRatio: 0 },
-  { mark: 'A标', name: '参数1', duration: '195ms', rebound: '12%', damping: '不适用', durationMs: 195, reboundPercent: 12, dampingRatio: 0 },
-  { mark: 'A标', name: '参数2', duration: '300ms', rebound: '15%', damping: '不适用', durationMs: 300, reboundPercent: 15, dampingRatio: 0 },
-  { mark: 'B标', name: '参数1', duration: '100ms', rebound: '18%', damping: '不适用', durationMs: 100, reboundPercent: 18, dampingRatio: 0 },
-  { mark: 'B标', name: '参数2', duration: '80ms', rebound: '20%', damping: '不适用', durationMs: 80, reboundPercent: 20, dampingRatio: 0 }
+  { mark: 'S标', name: '基准参数', duration: '300ms', rebound: '10%', damping: '不适用', durationMs: 300, reboundPercent: 10, dampingRatio: 0 },
+  { mark: 'A标', name: '参数1', duration: '250ms', rebound: '10.2%', damping: '不适用', durationMs: 250, reboundPercent: 10.2, dampingRatio: 0 },
+  { mark: 'A标', name: '参数2', duration: '380ms', rebound: '15%', damping: '不适用', durationMs: 380, reboundPercent: 15, dampingRatio: 0 },
+  { mark: 'B标', name: '参数1', duration: '200ms', rebound: '15%', damping: '不适用', durationMs: 200, reboundPercent: 15, dampingRatio: 0 },
+  { mark: 'B标', name: '参数2', duration: '400ms', rebound: '20%', damping: '不适用', durationMs: 400, reboundPercent: 20, dampingRatio: 0 }
 ];

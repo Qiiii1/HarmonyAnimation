@@ -3,6 +3,21 @@ export interface TaskbarUpReleaseDurations {
   returnMs: number;
 }
 
+export interface TaskbarUpCardSwipeDeformation {
+  rotateYDeg: number;
+  rotateZDeg: number;
+  skewXDeg: number;
+  scaleX: number;
+  scaleY: number;
+  originXPercent: number;
+  highlightOpacity: number;
+  shadowOpacity: number;
+  highlightOffsetX: number;
+  edgeRadiusOffset: number;
+  materialTranslateX: number;
+  materialTranslateY: number;
+}
+
 export const TASKBAR_UP_RELEASE_EASE_POWER: number = 5.2;
 
 function clamp(value: number, min: number, max: number): number {
@@ -91,4 +106,48 @@ export function taskbarUpFollowerReleaseTranslateX(
   }
 
   return lerp(sharedStartX, overshootX, progress);
+}
+
+export function taskbarUpCardSwipeDeformation(
+  visualOffsetX: number,
+  cardWidthPx: number,
+  maxDragPx: number,
+  velocitySignal: number = 0
+): TaskbarUpCardSwipeDeformation {
+  const cardWidth: number = Math.max(Math.abs(cardWidthPx), 1);
+  const referenceDrag: number = Math.max(Math.abs(maxDragPx), cardWidth * 0.35, 1);
+  const normalizedDrag: number = clamp(visualOffsetX / referenceDrag + velocitySignal, -1, 1);
+  const direction: number = normalizedDrag === 0 ? 0 : (normalizedDrag > 0 ? 1 : -1);
+  const dragStrength: number = 1 - Math.pow(1 - Math.abs(normalizedDrag), 2.05);
+  if (dragStrength <= 0) {
+    return {
+      rotateYDeg: 0,
+      rotateZDeg: 0,
+      skewXDeg: 0,
+      scaleX: 1,
+      scaleY: 1,
+      originXPercent: 50,
+      highlightOpacity: 0,
+      shadowOpacity: 0,
+      highlightOffsetX: 0,
+      edgeRadiusOffset: 0,
+      materialTranslateX: 0,
+      materialTranslateY: 0
+    };
+  }
+
+  return {
+    rotateYDeg: -direction * 36 * dragStrength,
+    rotateZDeg: direction * 1.6 * dragStrength,
+    skewXDeg: 0,
+    scaleX: 1 + 0.12 * dragStrength,
+    scaleY: 1,
+    originXPercent: direction > 0 ? lerp(50, -8, dragStrength) : lerp(50, 108, dragStrength),
+    highlightOpacity: 0.28 * dragStrength,
+    shadowOpacity: 0,
+    highlightOffsetX: -direction * 62 * dragStrength,
+    edgeRadiusOffset: 16 * dragStrength,
+    materialTranslateX: direction * 20 * dragStrength,
+    materialTranslateY: -7 * dragStrength
+  };
 }

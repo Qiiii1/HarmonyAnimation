@@ -5,13 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "/Users/liqi/.ohos/config/default_Test1_qLt_g2A6yK4GGc9D-_xU9sLoA8lgPU2WkuAr-mQphu4=.cer",
+          "certpath": "/Users/liqi/.ohos/config/default_HarmonyAnimation_eaeD7Y6pr0HWMcPEWuMzIjOUWDbxB2Eu-8lk_YkOxDE=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "000000191F8F92536744FEA4A61BFF139D08BFBCFA0F915927EE759BBF83CF26A28DE419C38C8D9F86",
-          "profile": "/Users/liqi/.ohos/config/default_Test1_qLt_g2A6yK4GGc9D-_xU9sLoA8lgPU2WkuAr-mQphu4=.p7b",
+          "keyPassword": "0000001AA2654A96F3FEDE41DD9F22E73D8A6DCA75DE6F0395D1E0FF2CC0954661FED4AC839E5F795D41",
+          "profile": "/Users/liqi/.ohos/config/default_HarmonyAnimation_eaeD7Y6pr0HWMcPEWuMzIjOUWDbxB2Eu-8lk_YkOxDE=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "/Users/liqi/.ohos/config/default_Test1_qLt_g2A6yK4GGc9D-_xU9sLoA8lgPU2WkuAr-mQphu4=.p12",
-          "storePassword": "0000001942318F2CB1749949ADBE31D6AAEDABEB367797BBACC51B9B1FD2CDA2136642FAE00E8A7E01"
+          "storeFile": "/Users/liqi/.ohos/config/default_HarmonyAnimation_eaeD7Y6pr0HWMcPEWuMzIjOUWDbxB2Eu-8lk_YkOxDE=.p12",
+          "storePassword": "0000001AAEF773D355DD02076381E0111F6276EB236B684CB4247F927ECFF0ACCD72516CA0D53C863BC6"
         }
       }
     ],
@@ -20,7 +20,7 @@
         "name": "default",
         "signingConfig": "default",
         "targetSdkVersion": "6.0.2(22)",
-        "compatibleSdkVersion": "6.0.2(22)",
+        "compatibleSdkVersion": "6.0.0(20)",
         "runtimeOS": "HarmonyOS",
         "buildOption": {
           "strictMode": {

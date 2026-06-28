@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
+    />
+    <title>Taskbar Up WebGL</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #02040a;
+        color: #fff;
+        touch-action: none;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      }
+
+      #fallbackStage {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 24% 18%, rgba(100, 148, 255, 0.42), transparent 34%),
+          radial-gradient(circle at 76% 72%, rgba(122, 211, 255, 0.22), transparent 38%),
+          linear-gradient(160deg, #17224a 0%, #080d1f 48%, #02040a 100%);
+      }
+
+      #fallbackStage::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.36));
+        pointer-events: none;
+      }
+
+      #fallbackHome {
+        position: absolute;
+        inset: -3%;
+        width: 106%;
+        height: 106%;
+        object-fit: cover;
+        filter: saturate(0.95) brightness(0.78) blur(0.3px);
+        opacity: 0.9;
+      }
+
+      .fallback-card {
+        position: absolute;
+        top: 18%;
+        left: 15%;
+        width: 70%;
+        height: 66%;
+        border-radius: 28px;
+        overflow: hidden;
+        opacity: 0;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
+        background:
+          linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02)),
+          var(--card-image),
+          linear-gradient(160deg, rgba(73, 109, 184, 0.72), rgba(10, 17, 35, 0.86));
+        background-size: cover;
+        background-position: center;
+        transform: translate3d(0, 26%, 0) scale(0.78);
+        transition: opacity 0.26s ease, transform 0.26s ease;
+      }
+
+      .fallback-card-one {
+        --card-image: var(--fallback-card-1, url("Card1.png"));
+      }
+
+      .fallback-card-two {
+        --card-image: var(--fallback-card-2, url("Card2.png"));
+      }
+
+      .fallback-card-three {
+        --card-image: var(--fallback-card-3, url("Card3.png"));
+      }
+
+      body.recents-open .fallback-card,
+      body.webgl-failed .fallback-card {
+        opacity: 0.72;
+        transform: translate3d(0, 0, 0) scale(0.92);
+      }
+
+      body.recents-open .fallback-card:nth-of-type(2),
+      body.webgl-failed .fallback-card:nth-of-type(2) {
+        transform: translate3d(18%, 2%, 0) scale(0.84);
+        opacity: 0.46;
+      }
+
+      body.recents-open .fallback-card:nth-of-type(3),
+      body.webgl-failed .fallback-card:nth-of-type(3) {
+        transform: translate3d(34%, 4%, 0) scale(0.78);
+        opacity: 0.28;
+      }
+
+      #glCanvas {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        width: 100%;
+        height: 100%;
+        display: block;
+        opacity: 0;
+        background: transparent;
+        touch-action: none;
+        transition: opacity 0.18s ease;
+      }
+
+      body.webgl-ready #glCanvas {
+        opacity: 1;
+      }
+
+      body.webgl-failed #glCanvas {
+        display: none;
+      }
+
+      #webglStatus {
+        position: fixed;
+        left: 18px;
+        right: 18px;
+        bottom: max(34px, calc(env(safe-area-inset-bottom) + 28px));
+        z-index: 4;
+        min-height: 34px;
+        padding: 8px 12px;
+        border-radius: 15px;
+        background: rgba(0, 0, 0, 0.34);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        color: rgba(255, 255, 255, 0.84);
+        font-size: 12px;
+        line-height: 18px;
+        text-align: center;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+
+      body.webgl-ready #webglStatus {
+        opacity: 0;
+      }
+
+      #grabber {
+        position: fixed;
+        left: 50%;
+        bottom: max(14px, env(safe-area-inset-bottom));
+        z-index: 5;
+        width: 116px;
+        height: 5px;
+        border-radius: 99px;
+        background: rgba(255, 255, 255, 0.72);
+        transform: translateX(-50%);
+        opacity: 0.72;
+        pointer-events: none;
+        transition: opacity 0.16s ease, transform 0.16s ease;
+      }
+
+      body.recents-open #grabber {
+        opacity: 0.26;
+        transform: translateX(-50%) scaleX(0.64);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="fallbackStage">
+      <img id="fallbackHome" src="Background2.png" alt="" />
+      <div class="fallback-card fallback-card-one"></div>
+      <div class="fallback-card fallback-card-two"></div>
+      <div class="fallback-card fallback-card-three"></div>
+    </div>
+    <canvas id="glCanvas"></canvas>
+    <div id="webglStatus">WebGL 初始化中</div>
+    <div id="grabber"></div>
+    <script>
+window.TASKBAR_UP_WEBGL_ASSETS = {
+  home: "Background2.png",
+  cards: [
+    "Card1.png",
+    "Card2.png",
+    "Card3.png",
+    "Card4.png"
+  ]
+};
+</script>
+    <script>
+      (() => {
+        "use strict";
+
+        const canvas = document.getElementById("glCanvas");
+        const statusLabel = document.getElementById("webglStatus");
+        const fallbackHome = document.getElementById("fallbackHome");
+
+        const rawfileAssetPaths = {
+          home: "Background2.png",
+          cards: [
+            "Card1.png",
+            "Card2.png",
+            "Card3.png",
+            "Card4.png",
+          ],
+        };
+
+        function getTextureAssetPaths() {
+          const embedded = window.TASKBAR_UP_WEBGL_ASSETS;
+          if (embedded && embedded.home && Array.isArray(embedded.cards) && embedded.cards.length > 0) {
+            return embedded;
+          }
+          return rawfileAssetPaths;
+        }
+
+        const assetPaths = getTextureAssetPaths();
+
+        if (fallbackHome) {
+          fallbackHome.src = assetPaths.home;
+        }
+        assetPaths.cards.slice(0, 3).forEach((path, index) => {
+          document.documentElement.style.setProperty(`--fallback-card-${index + 1}`, `url("${path}")`);
+        });
+
+        function setWebGLStatus(text) {
+          if (statusLabel) {
+            statusLabel.textContent = text;
+          }
+        }
+
+        function hideWebGLCanvas(reason) {
+          document.body.classList.remove("webgl-ready");
+          document.body.classList.add("webgl-failed");
+          setWebGLStatus(reason || "WebGL 暂不可用，已切换到素材预览");
+        }
+
+        function describeWebGLError(event) {
+          if (!event) {
+            return "未知错误";
+          }
+          const target = event.target || event.srcElement;
+          if (target && target !== window) {
+            const source = target.currentSrc || target.src || target.href || target.tagName || "资源";
+            return `资源加载失败：${source}`;
+          }
+          if (event.reason) {
+            return event.reason.message || String(event.reason);
+          }
+          return event.message || event.type || "未知错误";
+        }
+
+        window.addEventListener("error", (event) => {
+          hideWebGLCanvas(`WebGL 渲染异常：${describeWebGLError(event)}`);
+        }, true);
+        window.addEventListener("unhandledrejection", (event) => {
+          hideWebGLCanvas(`WebGL 渲染异常：${describeWebGLError(event)}`);
+        });
+
+        const gl =
+          canvas.getContext("webgl", {
+            alpha: false,
+            antialias: true,
+            premultipliedAlpha: false,
+          }) || canvas.getContext("experimental-webgl");
+
+        if (!gl) {
+          hideWebGLCanvas("当前 WebView 不支持 WebGL，已切换到素材预览");
+          return;
+        }
+
+        const params = {
+          durationMs: 900,
+          dampingRatio: 1,
+          reboundPercent: 5,
+        };
+        const ASSET_LOAD_TIMEOUT_MS = 6000;
+
+        window.setTaskbarUpParams = (next) => {
+          if (!next) {
+            return;
+          }
+          const durationMs = Number(next.durationMs);
+          const dampingRatio = Number(next.dampingRatio);
+          const reboundPercent = Number(next.reboundPercent);
+          if (Number.isFinite(durationMs) && durationMs > 0) {
+            params.durationMs = durationMs;
+          }
+          if (Number.isFinite(dampingRatio) && dampingRatio > 0) {
+            params.dampingRatio = dampingRatio;
+          }
+          if (Number.isFinite(reboundPercent)) {
+            params.reboundPercent = reboundPercent;
+          }
+        };
+
+        const state = {
+          open: 0,
+          openTarget: 0,
+          dragX: 0,
+          dragTargetX: 0,
+          active: 0,
+          press: false,
+          startX: 0,
+          startY: 0,
+          lastX: 0,
+          lastY: 0,
+          startOpen: 0,
+          width: 1,
+          height: 1,
+          time: 0,
+          hasRendered: false,
+        };
+
+        function clamp(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+
+        function mix(a, b, t) {
+          return a + (b - a) * t;
+        }
+
+        function easeOutCubic(t) {
+          const p = clamp(t, 0, 1) - 1;
+          return p * p * p + 1;
+        }
+
+        function compileShader(type, source) {
+          const shader = gl.createShader(type);
+          gl.shaderSource(shader, source);
+          gl.compileShader(shader);
+          if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            throw new Error(gl.getShaderInfoLog(shader) || "shader compile failed");
+          }
+          return shader;
+        }
+
+        function createProgram(vertexSource, fragmentSource) {
+          const program = gl.createProgram();
+          gl.attachShader(program, compileShader(gl.VERTEX_SHADER, vertexSource));
+          gl.attachShader(program, compileShader(gl.FRAGMENT_SHADER, fragmentSource));
+          gl.linkProgram(program);
+          if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            throw new Error(gl.getProgramInfoLog(program) || "program link failed");
+          }
+          return program;
+        }
+
+        const texturedVertex = `
+          attribute vec2 aUnit;
+          attribute vec2 aUv;
+          uniform vec2 uResolution;
+          uniform vec2 uCenter;
+          uniform vec2 uSize;
+          uniform float uScale;
+          uniform float uRotation;
+          uniform float uBend;
+          varying vec2 vUv;
+          varying float vEdgeLight;
+
+          void main() {
+            vec2 p = aUnit;
+            p.y += uBend * p.x * 0.06;
+
+            vec2 local = p * uSize * 0.5 * uScale;
+            float s = sin(uRotation);
+            float c = cos(uRotation);
+            vec2 rotated = vec2(local.x * c - local.y * s, local.x * s + local.y * c);
+            vec2 px = uCenter + rotated;
+            vec2 clip = vec2((px.x / uResolution.x) * 2.0 - 1.0, 1.0 - (px.y / uResolution.y) * 2.0);
+            gl_Position = vec4(clip, 0.0, 1.0);
+            vUv = aUv;
+            vEdgeLight = 0.5;
+          }
+        `;
+
+        const texturedFragment = `
+          precision mediump float;
+          uniform sampler2D uTexture;
+          uniform vec2 uMaskSize;
+          uniform float uRadius;
+          uniform float uAlpha;
+          uniform float uShade;
+          varying vec2 vUv;
+          varying float vEdgeLight;
+
+          float roundedMask(vec2 uv, vec2 size, float radius) {
+            vec2 q = abs(uv - 0.5) * size - (size * 0.5 - vec2(radius));
+            return 1.0 - smoothstep(-1.0, 1.2, length(max(q, 0.0)) - radius);
+          }
+
+          void main() {
+            vec4 color = texture2D(uTexture, vUv);
+            float mask = roundedMask(vUv, uMaskSize, uRadius);
+            float sideLight = mix(0.86, 1.12, vEdgeLight);
+            color.rgb *= sideLight * uShade;
+            gl_FragColor = vec4(color.rgb, color.a * mask * uAlpha);
+          }
+        `;
+
+        const colorVertex = `
+          attribute vec2 aUnit;
+          varying vec2 vUv;
+          void main() {
+            vUv = aUnit * 0.5 + 0.5;
+            gl_Position = vec4(aUnit, 0.0, 1.0);
+          }
+        `;
+
+        const colorFragment = `
+          precision mediump float;
+          uniform float uTime;
+          uniform float uOpen;
+          uniform vec2 uPointer;
+          varying vec2 vUv;
+
+          void main() {
+            vec2 p = vUv;
+            float glow = 0.34 / (0.18 + distance(p, uPointer));
+            float wave = sin((p.x * 4.0 + p.y * 3.0 + uTime) * 2.6) * 0.5 + 0.5;
+            vec3 base = mix(vec3(0.018, 0.028, 0.060), vec3(0.080, 0.110, 0.180), uOpen);
+            vec3 tint = vec3(0.08, 0.16, 0.28) * glow * (0.20 + uOpen * 0.32);
+            vec3 sweep = vec3(0.07, 0.13, 0.22) * wave * uOpen * 0.28;
+            gl_FragColor = vec4(base + tint + sweep, 1.0);
+          }
+        `;
+
+        const textureProgram = createProgram(texturedVertex, texturedFragment);
+        const colorProgram = createProgram(colorVertex, colorFragment);
+
+        function makeGrid(cols, rows) {
+          const units = [];
+          const uvs = [];
+          const indices = [];
+          for (let y = 0; y <= rows; y += 1) {
+            for (let x = 0; x <= cols; x += 1) {
+              const px = x / cols;
+              const py = y / rows;
+              units.push(px * 2 - 1, py * 2 - 1);
+              uvs.push(px, py);
+            }
+          }
+          for (let y = 0; y < rows; y += 1) {
+            for (let x = 0; x < cols; x += 1) {
+              const i = y * (cols + 1) + x;
+              indices.push(i, i + 1, i + cols + 1, i + 1, i + cols + 2, i + cols + 1);
+            }
+          }
+          return {
+            units: new Float32Array(units),
+            uvs: new Float32Array(uvs),
+            indices: new Uint16Array(indices),
+          };
+        }
+
+        const quad = {
+          units: new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+        };
+        const cardGrid = makeGrid(18, 10);
+        const cardBuffers = {
+          unit: gl.createBuffer(),
+          uv: gl.createBuffer(),
+          index: gl.createBuffer(),
+        };
+        const quadBuffer = gl.createBuffer();
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, cardBuffers.unit);
+        gl.bufferData(gl.ARRAY_BUFFER, cardGrid.units, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, cardBuffers.uv);
+        gl.bufferData(gl.ARRAY_BUFFER, cardGrid.uvs, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cardBuffers.index);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, cardGrid.indices, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, quad.units, gl.STATIC_DRAW);
+
+        const textureLocations = {
+          aUnit: gl.getAttribLocation(textureProgram, "aUnit"),
+          aUv: gl.getAttribLocation(textureProgram, "aUv"),
+          uResolution: gl.getUniformLocation(textureProgram, "uResolution"),
+          uCenter: gl.getUniformLocation(textureProgram, "uCenter"),
+          uSize: gl.getUniformLocation(textureProgram, "uSize"),
+          uMaskSize: gl.getUniformLocation(textureProgram, "uMaskSize"),
+          uScale: gl.getUniformLocation(textureProgram, "uScale"),
+          uRotation: gl.getUniformLocation(textureProgram, "uRotation"),
+          uBend: gl.getUniformLocation(textureProgram, "uBend"),
+          uTexture: gl.getUniformLocation(textureProgram, "uTexture"),
+          uRadius: gl.getUniformLocation(textureProgram, "uRadius"),
+          uAlpha: gl.getUniformLocation(textureProgram, "uAlpha"),
+          uShade: gl.getUniformLocation(textureProgram, "uShade"),
+        };
+
+        const colorLocations = {
+          aUnit: gl.getAttribLocation(colorProgram, "aUnit"),
+          uTime: gl.getUniformLocation(colorProgram, "uTime"),
+          uOpen: gl.getUniformLocation(colorProgram, "uOpen"),
+          uPointer: gl.getUniformLocation(colorProgram, "uPointer"),
+        };
+
+        function createTexture(path) {
+          const texture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            1,
+            1,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            new Uint8Array([18, 22, 32, 255])
+          );
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+          const image = new Image();
+          const entry = { texture, image, ready: false };
+          image.onload = () => {
+            entry.ready = true;
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+          };
+          image.onerror = () => {
+            entry.failed = true;
+            if (path === assetPaths.home) {
+              hideWebGLCanvas("素材加载失败，已切换到兜底预览");
+            }
+          };
+          image.src = path;
+          return entry;
+        }
+
+        const textures = {
+          home: createTexture(assetPaths.home),
+          cards: assetPaths.cards.map((path) => createTexture(path)),
+        };
+
+        function markWebGLStarted() {
+          if (state.hasRendered) {
+            return;
+          }
+          if (!textures.home.ready) {
+            return;
+          }
+          state.hasRendered = true;
+          document.body.classList.add("webgl-ready");
+          setWebGLStatus("WebGL 已启动");
+        }
+
+        function resize() {
+          const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+          const width = Math.max(1, Math.floor(window.innerWidth * dpr));
+          const height = Math.max(1, Math.floor(window.innerHeight * dpr));
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+          }
+          state.width = width;
+          state.height = height;
+          gl.viewport(0, 0, width, height);
+        }
+
+        function bindTextureProgram(texture) {
+          gl.useProgram(textureProgram);
+          gl.bindBuffer(gl.ARRAY_BUFFER, cardBuffers.unit);
+          gl.enableVertexAttribArray(textureLocations.aUnit);
+          gl.vertexAttribPointer(textureLocations.aUnit, 2, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ARRAY_BUFFER, cardBuffers.uv);
+          gl.enableVertexAttribArray(textureLocations.aUv);
+          gl.vertexAttribPointer(textureLocations.aUv, 2, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cardBuffers.index);
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.uniform1i(textureLocations.uTexture, 0);
+          gl.uniform2f(textureLocations.uResolution, state.width, state.height);
+        }
+
+        function drawImage(textureEntry, cx, cy, width, height, scale, rotation, bend, radius, alpha, shade) {
+          bindTextureProgram(textureEntry.texture);
+          gl.uniform2f(textureLocations.uCenter, cx, cy);
+          gl.uniform2f(textureLocations.uSize, width, height);
+          gl.uniform2f(textureLocations.uMaskSize, width, height);
+          gl.uniform1f(textureLocations.uScale, scale);
+          gl.uniform1f(textureLocations.uRotation, rotation);
+          gl.uniform1f(textureLocations.uBend, bend);
+          gl.uniform1f(textureLocations.uRadius, radius);
+          gl.uniform1f(textureLocations.uAlpha, alpha);
+          gl.uniform1f(textureLocations.uShade, shade);
+          gl.drawElements(gl.TRIANGLES, cardGrid.indices.length, gl.UNSIGNED_SHORT, 0);
+        }
+
+        function drawAmbient(time) {
+          gl.useProgram(colorProgram);
+          gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+          gl.enableVertexAttribArray(colorLocations.aUnit);
+          gl.vertexAttribPointer(colorLocations.aUnit, 2, gl.FLOAT, false, 0, 0);
+          gl.uniform1f(colorLocations.uTime, time * 0.001);
+          gl.uniform1f(colorLocations.uOpen, state.open);
+          gl.uniform2f(
+            colorLocations.uPointer,
+            clamp(state.lastX / Math.max(1, window.innerWidth), 0, 1),
+            clamp(state.lastY / Math.max(1, window.innerHeight), 0, 1)
+          );
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+
+        function coverSize(image, targetWidth, targetHeight) {
+          const imageRatio = image.width > 0 && image.height > 0 ? image.width / image.height : 0.46;
+          const targetRatio = targetWidth / targetHeight;
+          if (imageRatio > targetRatio) {
+            return [targetHeight * imageRatio, targetHeight];
+          }
+          return [targetWidth, targetWidth / imageRatio];
+        }
+
+        function render(time) {
+          resize();
+          state.time = time;
+          const damping = clamp(params.dampingRatio, 0.3, 2.5);
+          const duration = clamp(params.durationMs, 240, 1800);
+          const follow = clamp(1000 / duration / damping, 0.055, 0.22);
+          state.open += (state.openTarget - state.open) * follow;
+          state.dragX += (state.dragTargetX - state.dragX) * clamp(follow * 1.35, 0.08, 0.28);
+
+          document.body.classList.toggle("recents-open", state.open > 0.45);
+
+          gl.disable(gl.DEPTH_TEST);
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+          gl.clearColor(0.0, 0.0, 0.0, 1.0);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+
+          drawAmbient(time);
+
+          const homeSize = coverSize(textures.home.image, state.width, state.height);
+          const homeScale = mix(1.0, 0.92, easeOutCubic(state.open));
+          drawImage(
+            textures.home,
+            state.width * 0.5,
+            state.height * 0.5,
+            homeSize[0],
+            homeSize[1],
+            homeScale,
+            0,
+            -0.04 * state.open,
+            0,
+            1,
+            mix(1, 0.62, state.open)
+          );
+
+          const open = easeOutCubic(state.open);
+          const cardWidth = mix(state.width * 0.92, state.width * 0.70, open);
+          const cardHeight = mix(state.height * 1.02, state.height * 0.72, open);
+          const spacing = state.width * 0.68;
+          const reboundBoost = 0.62 + clamp(params.reboundPercent, 0, 22) / 24;
+          const activeOffset = clamp(state.dragX / Math.max(1, state.width), -1, 1);
+
+          for (let i = textures.cards.length - 1; i >= 0; i -= 1) {
+            const relative = i - state.active;
+            const distance = Math.abs(relative + activeOffset);
+            if (distance > 2.6) {
+              continue;
+            }
+            const x = state.width * 0.5 + (relative * spacing + state.dragX) * open;
+            const y = mix(state.height * 0.55, state.height * 0.49 + distance * state.height * 0.018, open);
+            const scale = mix(1, 1 - Math.min(distance, 2) * 0.10, open);
+            const rotation = (relative * -0.045 + activeOffset * 0.12) * open;
+            const bend = clamp((activeOffset * 0.20 - relative * 0.02) * open * reboundBoost, -0.20, 0.20);
+            const alpha = clamp(open * (1.05 - Math.max(0, distance - 1.5) * 0.55), 0, 1);
+            const shade = 1 - Math.min(distance, 2) * 0.12 * open;
+            drawImage(
+              textures.cards[i],
+              x,
+              y,
+              cardWidth,
+              cardHeight,
+              scale,
+              rotation,
+              bend,
+              34 * (window.devicePixelRatio || 1),
+              alpha,
+              shade
+            );
+          }
+
+          markWebGLStarted();
+
+          requestAnimationFrame(render);
+        }
+
+        function start(point) {
+          state.press = true;
+          state.startX = point.clientX;
+          state.startY = point.clientY;
+          state.lastX = point.clientX;
+          state.lastY = point.clientY;
+          state.startOpen = state.openTarget;
+          state.dragTargetX = 0;
+        }
+
+        function move(point, event) {
+          if (!state.press) {
+            return;
+          }
+          if (event) {
+            event.preventDefault();
+          }
+          const dx = point.clientX - state.startX;
+          const dy = point.clientY - state.startY;
+          state.lastX = point.clientX;
+          state.lastY = point.clientY;
+          if (state.startOpen < 0.5 && Math.abs(dy) > Math.abs(dx)) {
+            state.openTarget = clamp(state.startOpen + -dy / Math.max(140, window.innerHeight * 0.32), 0, 1);
+            return;
+          }
+          if (state.openTarget > 0.5) {
+            state.dragTargetX = dx;
+          }
+        }
+
+        function end() {
+          if (!state.press) {
+            return;
+          }
+          state.press = false;
+          if (state.openTarget < 0.5) {
+            state.openTarget = state.open > 0.34 ? 1 : 0;
+          } else {
+            const threshold = window.innerWidth * 0.18;
+            if (Math.abs(state.dragTargetX) > threshold) {
+              const next = state.active + (state.dragTargetX < 0 ? 1 : -1);
+              state.active = clamp(next, 0, textures.cards.length - 1);
+            }
+            state.openTarget = 1;
+          }
+          state.dragTargetX = 0;
+        }
+
+        if (window.PointerEvent) {
+          canvas.addEventListener("pointerdown", (event) => {
+            if (canvas.setPointerCapture) {
+              canvas.setPointerCapture(event.pointerId);
+            }
+            start(event);
+          });
+          canvas.addEventListener("pointermove", (event) => move(event, event), { passive: false });
+          canvas.addEventListener("pointerup", end);
+          canvas.addEventListener("pointercancel", end);
+        } else {
+          canvas.addEventListener("touchstart", (event) => {
+            if (event.touches.length > 0) {
+              start(event.touches[0]);
+            }
+          }, { passive: false });
+          canvas.addEventListener("touchmove", (event) => {
+            if (event.touches.length > 0) {
+              move(event.touches[0], event);
+            }
+          }, { passive: false });
+          canvas.addEventListener("touchend", end);
+          canvas.addEventListener("touchcancel", end);
+        }
+        window.addEventListener("resize", resize);
+
+        resize();
+        requestAnimationFrame(render);
+        setTimeout(() => {
+          if (!state.hasRendered) {
+            hideWebGLCanvas(textures.home.ready ? "WebGL 启动超时，已切换到素材预览" : "素材加载超时，已切换到素材预览");
+          }
+        }, ASSET_LOAD_TIMEOUT_MS);
+      })();
+    </script>
+  </body>
+</html>

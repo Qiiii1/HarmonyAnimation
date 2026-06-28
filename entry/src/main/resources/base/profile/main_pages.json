@@ -4,6 +4,7 @@
     "pages/ScenePage",
     "pages/VolumePage",
     "pages/TaskbarUpPage",
+    "pages/TaskbarUpWebGLPage",
     "pages/UnlockDesktopPage",
     "pages/TaskbarDownPage",
     "pages/config/AllConfigPage",

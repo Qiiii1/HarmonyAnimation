@@ -145,6 +145,16 @@ struct TaskbarUpConfigPage {
     }
   }
 
+  private openWebGLPreviewPage(): void {
+    try {
+      const options: TaskbarUpPreviewRouteOptions = {
+        url: 'pages/TaskbarUpWebGLPage',
+      };
+      this.getUIContext().getRouter().pushUrl(options);
+    } catch (_error) {
+    }
+  }
+
   @Builder
   private buildHeader() {
     Column({ space: 10 }) {
@@ -330,6 +340,33 @@ struct TaskbarUpConfigPage {
     )
   }
 
+  @Builder
+  private buildWebGLPreviewButton() {
+    Stack() {
+      Text('WebGL 预览')
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#FFFFFFFF')
+    }
+    .width('100%')
+    .height(54)
+    .backgroundColor('#24FFFFFF')
+    .borderRadius(20)
+    .border({
+      width: 1,
+      color: '#30FFFFFF'
+    })
+    .onClick(() => {
+      this.openWebGLPreviewPage();
+    })
+    .gesture(
+      TapGesture({ count: 1 })
+        .onAction(() => {
+          this.openWebGLPreviewPage();
+        })
+    )
+  }
+
   build() {
     Stack() {
       Image($r('app.media.Background2'))
@@ -369,6 +406,7 @@ struct TaskbarUpConfigPage {
             this.buildPresetDetail()
             this.buildSabParameterColumn()
             this.buildPreviewButton()
+            this.buildWebGLPreviewButton()
           }
           .width('100%')
           .padding(this.PANEL_PADDING)
