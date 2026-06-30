@@ -307,14 +307,40 @@ assert.ok(rawfileHtml.includes('uFold') && rawfileHtml.includes('uFly'), 'WebGL 
 assert.ok(
   rawfileHtml.includes('uniform float uTwist;') &&
     rawfileHtml.includes('gl.uniform1f(textureLocations.uTwist, twist || 0);') &&
-    rawfileHtml.includes('float twistAngle = uTwist * p.y * 1.35;') &&
+    rawfileHtml.includes('float twistAngle = uTwist * (1.0 - aUv.y) * 1.35;') &&
     rawfileHtml.includes('float twistZ = local.x * twistSin * 0.78;'),
   'WebGL upward dismiss should twist the card surface row-by-row into a native-like spiral'
 );
 assert.ok(
   rawfileHtml.includes('dismissTwist = soft(clamp((dismissT - 0.12) / 0.58, 0, 1)) * 2.7;') &&
-    rawfileHtml.includes('twist: clamp(dismissTwist, 0, 2.7),'),
+    rawfileHtml.includes('twist: clamp(dismissTwist * 0.58, 0, 1.5),'),
   'WebGL upward dismiss should ramp a strong twist value during card deletion'
+);
+assert.ok(
+  rawfileHtml.includes('function getCardAspectRatio()') &&
+    rawfileHtml.includes('const cardAspect = getCardAspectRatio();') &&
+    rawfileHtml.includes('const openCardHeight = state.height * 0.68;') &&
+    rawfileHtml.includes('const openCardWidth = openCardHeight * cardAspect;') &&
+    rawfileHtml.includes('const closedCardHeight = closedCardWidth / cardAspect;'),
+  'WebGL recents cards should preserve the original card texture aspect ratio instead of stretching to viewport proportions'
+);
+assert.ok(
+  !rawfileHtml.includes('const cardWidth = mix(state.width * 0.92, state.width * 0.64, p);') &&
+    !rawfileHtml.includes('const cardHeight = mix(state.height * 1.02, state.height * 0.68, p);'),
+  'WebGL card layout should not use independent viewport width and height factors that distort the card ratio'
+);
+assert.ok(
+  rawfileHtml.includes('uniform float uBlurAmount;') &&
+    rawfileHtml.includes('gl.uniform1f(textureLocations.uBlurAmount, blur || 0);') &&
+    rawfileHtml.includes('vec2 blurStep = uBlurAmount / max(uMaskSize, vec2(1.0));'),
+  'WebGL upward dismiss should blur the card texture as it approaches deletion'
+);
+assert.ok(
+  rawfileHtml.includes('const deleteVisualProgress = soft(clamp((dismissT - 0.18) / 0.68, 0, 1));') &&
+    rawfileHtml.includes('dismissBlur = deleteVisualProgress * 7.5 * (window.devicePixelRatio || 1);') &&
+    rawfileHtml.includes('dismissFade = 1 - deleteVisualProgress * 0.55;') &&
+    rawfileHtml.includes('alpha *= dismissFade;'),
+  'WebGL upward dismiss should reduce card opacity and increase blur near deletion'
 );
 assert.ok(
   !rawfileHtml.includes('dragTargetX'),
@@ -381,10 +407,18 @@ assert.ok(
   'WebGL card labels should be drawn with card parent dimensions and card-local offset so icon and tag deform with the card'
 );
 assert.ok(rawfileHtml.includes('localOffsetY,\n            card.twist'), 'WebGL card labels should inherit the deletion twist from the card surface');
+assert.ok(
+  rawfileHtml.includes('const labelAlpha = card.labelAlpha === undefined ? (card.alpha > 0.01 ? 1 : 0) : card.labelAlpha;') &&
+    rawfileHtml.includes('labelAlpha: isDismissedCard ? dismissFade : (alpha > 0.01 ? 1 : 0),'),
+  'WebGL card icon and tag should fade out together with the upward delete animation'
+);
 assert.ok(rawfileHtml.includes('const LABEL_ICON_SIZE = 20;'), 'WebGL card label icons should be smaller and lighter above the cards');
 assert.ok(rawfileHtml.includes('const LABEL_TEXT_SIZE = 15;'), 'WebGL card label text should be slightly smaller beside the icon');
 assert.ok(rawfileHtml.includes('fillStyle = \"#ffffff\"'), 'WebGL card label text should be fully opaque white');
-assert.ok(rawfileHtml.includes('const labelAlpha = card.alpha > 0.01 ? 1 : 0;'), 'WebGL card icon and tag should not be semi-transparent once their card is visible');
+assert.ok(
+  rawfileHtml.includes('const labelAlpha = card.labelAlpha === undefined ? (card.alpha > 0.01 ? 1 : 0) : card.labelAlpha;'),
+  'WebGL card icon and tag should stay opaque during normal recents display and only fade when a delete animation supplies labelAlpha'
+);
 assert.ok(
   rawfileHtml.includes('if (radius <= 0.5) {\n              return 1.0;\n            }'),
   'WebGL transparent label textures should bypass the rounded-card mask so icon and tag are not rendered semi-transparent'
@@ -394,7 +428,7 @@ assert.ok(
   rawfileHtml.includes('const dynamicGap = state.width * 0.70 - state.width * 0.045 * soft(panCurve);'),
   'WebGL recents cards should sit closer together with a native-like horizontal gap'
 );
-assert.ok(rawfileHtml.includes('state.width * 0.64') && rawfileHtml.includes('state.height * 0.68'), 'WebGL recents cards should be scaled closer to the native reference proportions');
+assert.ok(rawfileHtml.includes('state.height * 0.68'), 'WebGL recents cards should be scaled closer to the native reference proportions');
 
 const rootPreviewAssets = [
   ['Background2.png', 'taskbar_up_webgl_background2.png'],
