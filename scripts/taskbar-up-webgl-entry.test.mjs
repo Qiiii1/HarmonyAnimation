@@ -69,6 +69,19 @@ const rawTextureStart = rawfileHtml.indexOf(rawTextureMarker) + rawTextureMarker
 const rawTextureEnd = rawfileHtml.indexOf(';\n</script>', rawTextureStart);
 assert.ok(rawTextureStart >= rawTextureMarker.length && rawTextureEnd > rawTextureStart, 'WebGL rawfile should expose parseable inline raw texture data');
 const rawTextures = JSON.parse(rawfileHtml.slice(rawTextureStart, rawTextureEnd));
+
+function countTransparentDarkMattePixels(texture) {
+  const bytes = Buffer.from(texture.rgba, 'base64');
+  let count = 0;
+  for (let offset = 0; offset < bytes.length; offset += 4) {
+    const alpha = bytes[offset + 3];
+    if (alpha > 0 && alpha <= 32 && bytes[offset] < 8 && bytes[offset + 1] < 8 && bytes[offset + 2] < 8) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
 const scheduleApplyMatch = rawfileHtml.match(/function scheduleApplyTaskbarUpAssetChunks\(\) \{([\s\S]*?)\n        \}/);
 const scheduleApplyBody = scheduleApplyMatch ? scheduleApplyMatch[1] : '';
 const loadTextureMatch = rawfileHtml.match(/function loadTexture\(entry, path, sourceImage, batchId\) \{([\s\S]*?)\n        \}/);
@@ -178,8 +191,8 @@ assert.ok(!rawfileHtml.includes('<img id="fallbackBackground2" src="taskbar_up_w
 assert.ok(!rawfileHtml.includes('<img id="fallbackBackground3" src="taskbar_up_webgl_background3.png"'), 'WebGL fallback background3 image should not rely on a relative rawfile URL that can hang in Harmony WebView');
 assert.ok(!rawfileHtml.includes('assets/preview/'), 'WebGL rawfile should not rely on nested preview asset paths');
 assert.ok(
-  rawfileHtml.length < 11000000,
-  'WebGL rawfile should remain bounded even with the inline raw RGBA textures'
+  rawfileHtml.length < 24000000,
+  'WebGL rawfile should remain bounded even with high-resolution inline raw RGBA textures'
 );
 assert.ok(rawfileHtml.includes('markWebGLStarted'), 'WebGL rawfile should expose a guarded ready transition');
 assert.ok(
@@ -213,9 +226,9 @@ assert.ok(rawfileHtml.includes('uniform float uTiltY;'), 'WebGL shader should ex
 assert.ok(rawfileHtml.includes('uniform float uDepth;'), 'WebGL shader should expose card Z depth so horizontal swipe can move the card backward like the reference');
 assert.ok(rawfileHtml.includes('uniform float uPerspective;'), 'WebGL shader should project tilted cards with a CSS-like perspective');
 assert.ok(
-  rawfileHtml.includes('float x3 = twistedX * cosY + twistZ * sinY;') &&
-    rawfileHtml.includes('float z3 = uDepth + twistZ * cosY + twistedX * sinY;'),
-  'WebGL shader should rotate card vertices around the Y axis instead of only warping the 2D quad'
+  rawfileHtml.includes('float x3 = local.x * cosY;') &&
+    rawfileHtml.includes('float z3 = uDepth + local.x * sinY;'),
+  'WebGL shader should keep Y-axis card perspective without delete-time twist deformation'
 );
 assert.ok(rawfileHtml.includes('float perspectiveScale = uPerspective / max(120.0, uPerspective - z3);'), 'WebGL shader should apply perspective scaling from card depth');
 assert.ok(rawfileHtml.includes('const tiltY = (-bendDir * bendDeg) * Math.PI / 180;'), 'WebGL layout should translate the reference activeRotY into shader tilt');
@@ -223,9 +236,9 @@ assert.ok(rawfileHtml.includes('const depth = -bendAmt * state.width * 0.16 * be
 assert.ok(rawfileHtml.includes('width: 100vw;') && rawfileHtml.includes('height: 100dvh;'), 'WebGL rawfile should size the page to the full visual viewport');
 assert.ok(rawfileHtml.includes('inset: 0;') && rawfileHtml.includes('width: 100%;') && rawfileHtml.includes('height: 100%;'), 'DOM fallback desktop backgrounds should fill the viewport without overscaling the layer container');
 assert.ok(
-  rawfileHtml.includes('background2: "resource://rawfile/taskbar_up_webgl_background2.png"') &&
+  rawfileHtml.includes('background2: "resource://rawfile/taskbar_up_webgl_background5.png"') &&
     rawfileHtml.includes('background3: "resource://rawfile/taskbar_up_webgl_background3.png"'),
-  'WebGL rawfile should use Background2 and Background3 as the taskbar-up desktop background layers'
+  'WebGL rawfile should use Background5 as the base background and Background3 as the foreground desktop layer'
 );
 assert.ok(
   rawfileHtml.indexOf('drawTaskbarBackgroundLayer(textures.background2') >= 0 &&
@@ -233,11 +246,11 @@ assert.ok(
   'WebGL rawfile should draw Background3 after Background2 so Background3 is visually in front'
 );
 assert.ok(
-  rawfileHtml.includes('const backgroundSoftMix = ease(p);'),
-  'WebGL taskbar-up should gradually mix both background layers into a soft blurred state as recents opens'
+  rawfileHtml.includes('const backgroundSoftMix = soft(clamp((exitBackgroundProgress - 0.015) / 0.48, 0, 1));'),
+  'WebGL taskbar-up should reach a stronger soft background state shortly after recents opens'
 );
 assert.ok(
-  rawfileHtml.includes('const background3Scale = mix(1, 0.95, p);'),
+  rawfileHtml.includes('const background3Scale = mix(1, 0.95, exitBackgroundProgress);'),
   'WebGL taskbar-up should gradually shrink the front Background3 layer as recents opens'
 );
 assert.ok(
@@ -251,23 +264,45 @@ assert.ok(
   'WebGL soft background textures should be lower frequency for a stronger native-like blur'
 );
 assert.ok(
-  rawfileHtml.includes('const backgroundSoftMix = ease(p);') &&
-    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background2, 1, 1 - backgroundSoftMix);') &&
-    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background2Soft, 1, backgroundSoftMix);') &&
-    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background3, background3Scale, 1 - backgroundSoftMix);') &&
-    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background3Soft, background3Scale, backgroundSoftMix);'),
-  'WebGL taskbar-up should crossfade sharp backgrounds into soft low-frequency backgrounds while preserving layer order'
+  rawTextures.background2.width >= 800 &&
+    rawTextures.background3.width >= 800,
+  'WebGL sharp background textures should stay high-resolution so foreground desktop details remain crisp'
+);
+assert.equal(
+  countTransparentDarkMattePixels(rawTextures.background3),
+  0,
+  'WebGL foreground desktop texture should not preserve black RGB in transparent icon-layer edges'
+);
+assert.equal(
+  countTransparentDarkMattePixels(rawTextures.background3Soft),
+  0,
+  'WebGL soft foreground desktop texture should not preserve black RGB in transparent icon-layer edges'
+);
+assert.ok(
+  rawfileHtml.includes('const backgroundBlur = soft(clamp((exitBackgroundProgress - 0.04) / 0.58, 0, 1)) * 17.5 * (window.devicePixelRatio || 1);') &&
+    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background2, 1, 1 - backgroundSoftMix, backgroundBlur * 0.18);') &&
+    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background2Soft, 1, backgroundSoftMix, backgroundBlur);') &&
+    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background3, background3Scale, 1 - backgroundSoftMix, backgroundBlur * 0.18);') &&
+    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background3Soft, background3Scale, backgroundSoftMix, backgroundBlur);'),
+  'WebGL taskbar-up should combine soft background textures with additional shader blur while preserving layer order'
 );
 assert.ok(
   rawfileHtml.includes('function drawBackgroundScrim(alpha)') &&
-    rawfileHtml.includes('const backgroundDimAlpha = mix(0, 0.5, ease(p));') &&
+    rawfileHtml.includes('const backgroundDimAlpha = mix(0, 0.34, ease(exitBackgroundProgress));') &&
     rawfileHtml.includes('drawBackgroundScrim(backgroundDimAlpha);'),
-  'WebGL taskbar-up should apply a black filter over the background in the triggered state'
+  'WebGL taskbar-up should apply a lighter black filter over the background in the triggered state'
 );
 assert.ok(
   !rawfileHtml.includes('uBlurRadius * vec2(1.0, 0.0)') &&
     !rawfileHtml.includes('uBlurRadius * vec2(-1.0, 0.0)'),
   'WebGL background blur should avoid sparse directional texture samples that create visible ghost copies'
+);
+assert.ok(
+  rawfileHtml.includes('vec4 sampleTexturePremultiplied(vec2 uv, float weight)') &&
+    rawfileHtml.includes('sample.rgb *= sample.a;') &&
+    rawfileHtml.includes('color.rgb = color.a > 0.001 ? color.rgb / color.a : vec3(0.0);') &&
+    !rawfileHtml.includes('vec4 color = texture2D(uTexture, vUv) * 0.11;'),
+  'WebGL texture blur should average premultiplied samples so transparent pixels do not create black outlines'
 );
 assert.ok(rawfileHtml.includes('filter: saturate(1) brightness(1) blur(0px);'), 'DOM fallback desktop background should look like the native wallpaper instead of a dim debug layer');
 assert.ok(rawfileHtml.includes('window.addEventListener("error"'), 'WebGL rawfile should recover from script errors visibly');
@@ -278,11 +313,22 @@ assert.ok(!rawfileHtml.includes('resource://rawfile/taskbar_up_webgl/assets/'), 
 assert.ok(rawfileHtml.includes('window.setTaskbarUpParams'), 'WebGL rawfile should accept native taskbar-up parameters');
 assert.ok(rawfileHtml.includes('prgT: 0'), 'WebGL rawfile should keep the reference enter target state');
 assert.ok(rawfileHtml.includes('idxT: cards.length - 1'), 'WebGL rawfile should keep the reference horizontal target index');
+assert.ok(
+  rawfileHtml.includes('function resetToRightmostCard()') &&
+    rawfileHtml.includes('S.idxT = maxSlotIndex();') &&
+    rawfileHtml.includes('S.idx = S.idxT;') &&
+    rawfileHtml.includes('if (S.prg < 0.5) {') &&
+    rawfileHtml.includes('S.recentsExit = null;\n            resetToRightmostCard();\n            mode = "enter";'),
+  'WebGL recents should reset to the rightmost available card every time it opens'
+);
 assert.ok(rawfileHtml.includes('bend: 0'), 'WebGL rawfile should keep the reference bend state');
 assert.ok(rawfileHtml.includes('dragDX: 0') && rawfileHtml.includes('dragDY: 0'), 'WebGL rawfile should keep reference drag deltas');
 assert.ok(rawfileHtml.includes('dismissCancel: null'), 'WebGL rawfile should support canceling an upward card dismiss');
 assert.ok(rawfileHtml.includes('reflow: null'), 'WebGL rawfile should support live card reflow after dismiss');
 assert.ok(rawfileHtml.includes('neighborShrink: 0'), 'WebGL rawfile should shrink neighboring cards during dismiss like the reference');
+assert.ok(rawfileHtml.includes('recentsExit: null'), 'WebGL rawfile should keep a dedicated recents exit state separate from the open progress');
+assert.ok(rawfileHtml.includes('const RECENTS_EXIT_MS = 260'), 'WebGL recents exit should be faster than the normal spring-driven enter animation');
+assert.ok(rawfileHtml.includes('const RECENTS_BACKGROUND_EXIT_MS = 420'), 'WebGL recents background should restore more slowly than the cards exit');
 assert.ok(rawfileHtml.includes('mode = "undecided"'), 'WebGL rawfile should decide between horizontal pan and upward dismiss after recents are open');
 assert.ok(rawfileHtml.includes('mode === "pan"') && rawfileHtml.includes('mode === "dismiss"'), 'WebGL rawfile should model the reference pan and dismiss modes');
 assert.ok(
@@ -294,8 +340,35 @@ assert.ok(
   rawfileHtml.includes('hitCardIndex(clientX, clientY, allowFallback = true)') &&
     rawfileHtml.includes('const directHit = hitCardIndex(point.clientX, point.clientY, false);') &&
     rawfileHtml.includes('mode = "background-tap";') &&
-    rawfileHtml.includes('S.prgT = 0;'),
-  'WebGL rawfile should close recents when the user taps blank background space'
+    rawfileHtml.includes('startRecentsExit();'),
+  'WebGL rawfile should close recents with a dedicated exit animation when the user taps blank background space'
+);
+assert.ok(
+  !rawfileHtml.includes('if (Math.abs(S.dragDX) < 10 && Math.abs(S.dragDY) < 10) {\n              S.prgT = 0;'),
+  'WebGL recents should not collapse the desktop blur before the cards have finished exiting'
+);
+assert.ok(
+    rawfileHtml.includes('function startRecentsExit()') &&
+    rawfileHtml.includes('S.recentsExit = {') &&
+    rawfileHtml.includes('dur: RECENTS_EXIT_MS,') &&
+    rawfileHtml.includes('backgroundDur: RECENTS_BACKGROUND_EXIT_MS,') &&
+    rawfileHtml.includes('S.prgT = 1;'),
+  'WebGL recents exit should hold the background open while the card exit animation runs'
+);
+assert.ok(
+  rawfileHtml.includes('exitBackgroundT = clamp(exitElapsed / S.recentsExit.backgroundDur, 0, 1);') &&
+    rawfileHtml.includes('if (exitT >= 1 && exitBackgroundT >= 1) {') &&
+    rawfileHtml.includes('const exitBackgroundProgress = recentsExitActive ? 1 - soft(clamp((exitBackgroundT - 0.26) / 0.74, 0, 1)) : S.prg;') &&
+    rawfileHtml.includes('const p = recentsExitActive ? 1 : S.prg;') &&
+    rawfileHtml.includes('const backgroundSoftMix = soft(clamp((exitBackgroundProgress - 0.015) / 0.48, 0, 1));'),
+  'WebGL desktop blur should restore gradually after the faster card exit has begun'
+);
+assert.ok(
+  rawfileHtml.includes('const exitOrder = clamp((rawRel + 2.4) / 4.8, 0, 1);') &&
+    rawfileHtml.includes('const exitDelay = (1 - exitOrder) * 0.18;') &&
+    rawfileHtml.includes('const exitProgress = recentsExitActive ? soft(clamp((exitT - exitDelay) / 0.64, 0, 1)) : 0;') &&
+    rawfileHtml.includes('const exitX = -state.width * (1.08 + 0.18 * (1 - exitOrder)) * exitProgress;'),
+  'WebGL recents cards should exit faster from right to left instead of waiting for the desktop spring'
 );
 assert.ok(rawfileHtml.includes('frameDX') && rawfileHtml.includes('S.idxT - frameDX /'), 'WebGL rawfile should advance card index from per-frame horizontal movement');
 assert.ok(rawfileHtml.includes('S.bend +='), 'WebGL rawfile should animate bend from drag and index velocity');
@@ -305,16 +378,17 @@ assert.ok(rawfileHtml.includes('function closeDismissedCard'), 'WebGL rawfile sh
 assert.ok(rawfileHtml.includes('FLY_REFLOW_AT'), 'WebGL rawfile should start reflow during the dismiss fly phase');
 assert.ok(rawfileHtml.includes('uFold') && rawfileHtml.includes('uFly'), 'WebGL rawfile should expose fold/fly shader uniforms for upward dismiss');
 assert.ok(
-  rawfileHtml.includes('uniform float uTwist;') &&
-    rawfileHtml.includes('gl.uniform1f(textureLocations.uTwist, twist || 0);') &&
-    rawfileHtml.includes('float twistAngle = uTwist * (1.0 - aUv.y) * 1.35;') &&
-    rawfileHtml.includes('float twistZ = local.x * twistSin * 0.78;'),
-  'WebGL upward dismiss should twist the card surface row-by-row into a native-like spiral'
+  !rawfileHtml.includes('uniform float uTwist;') &&
+    !rawfileHtml.includes('textureLocations.uTwist') &&
+    !rawfileHtml.includes('twistAngle') &&
+    !rawfileHtml.includes('twistZ'),
+  'WebGL upward dismiss should not apply twist deformation when deleting a card'
 );
 assert.ok(
-  rawfileHtml.includes('dismissTwist = soft(clamp((dismissT - 0.12) / 0.58, 0, 1)) * 2.7;') &&
-    rawfileHtml.includes('twist: clamp(dismissTwist * 0.58, 0, 1.5),'),
-  'WebGL upward dismiss should ramp a strong twist value during card deletion'
+  !rawfileHtml.includes('dismissTwist') &&
+    !rawfileHtml.includes('card.twist') &&
+    !rawfileHtml.includes('twist:'),
+  'WebGL upward dismiss should remove the card without sending twist values through layout or labels'
 );
 assert.ok(
   rawfileHtml.includes('function getCardAspectRatio()') &&
@@ -332,15 +406,32 @@ assert.ok(
 assert.ok(
   rawfileHtml.includes('uniform float uBlurAmount;') &&
     rawfileHtml.includes('gl.uniform1f(textureLocations.uBlurAmount, blur || 0);') &&
-    rawfileHtml.includes('vec2 blurStep = uBlurAmount / max(uMaskSize, vec2(1.0));'),
-  'WebGL upward dismiss should blur the card texture as it approaches deletion'
+    rawfileHtml.includes('vec2 blurStep = min(uBlurAmount / max(uMaskSize, vec2(1.0)), vec2(0.064));') &&
+    rawfileHtml.includes('vec2 diagonalStep = blurStep * 0.72;') &&
+    rawfileHtml.includes('vec2 farStep = min(blurStep * 2.35, vec2(0.102));') &&
+    rawfileHtml.includes('vec2 farDiagonalStep = farStep * 0.72;') &&
+    rawfileHtml.includes('vec2 wideStep = min(farStep * 1.55, vec2(0.128));') &&
+    rawfileHtml.includes('vec2 wideDiagonalStep = wideStep * 0.72;'),
+  'WebGL upward dismiss and background blur should use wider, softer multi-ring samples instead of sparse cross samples'
 );
 assert.ok(
-  rawfileHtml.includes('const deleteVisualProgress = soft(clamp((dismissT - 0.18) / 0.68, 0, 1));') &&
-    rawfileHtml.includes('dismissBlur = deleteVisualProgress * 7.5 * (window.devicePixelRatio || 1);') &&
-    rawfileHtml.includes('dismissFade = 1 - deleteVisualProgress * 0.55;') &&
+  rawfileHtml.includes('float roundedMask(vec2 uv, vec2 size, float radius, float softness)') &&
+    rawfileHtml.includes('float edgeSoftness = mix(1.8, max(1.8, uBlurAmount * 1.18), clamp(uBlurAmount / 18.0, 0.0, 1.0));') &&
+    rawfileHtml.includes('float mask = roundedMask(vUv, uMaskSize, uRadius, edgeSoftness);') &&
+    !rawfileHtml.includes('float mask = roundedMask(vUv, uMaskSize, uRadius);'),
+  'WebGL upward dismiss blur should soften the rounded card mask so the card edge blurs with the content'
+);
+assert.ok(
+  rawfileHtml.includes('const deleteVisualProgress = soft(clamp((dismissT - 0.58) / 0.36, 0, 1));') &&
+    rawfileHtml.includes('dismissBlur = deleteVisualProgress * 19 * (window.devicePixelRatio || 1);') &&
+    rawfileHtml.includes('dismissFade = 1 - deleteVisualProgress * 0.62;') &&
     rawfileHtml.includes('alpha *= dismissFade;'),
-  'WebGL upward dismiss should reduce card opacity and increase blur near deletion'
+  'WebGL upward dismiss should reduce card opacity and increase blur only when the card is close to deletion'
+);
+assert.ok(
+  rawfileHtml.includes('const dismissRightShift = deleteVisualProgress;') &&
+    rawfileHtml.includes('pageX = state.width * 0.12 * dismissRightShift;'),
+  'WebGL upward dismiss should drift the deleted card right only when it is close to deletion'
 );
 assert.ok(
   !rawfileHtml.includes('dragTargetX'),
@@ -406,7 +497,7 @@ assert.ok(
   rawfileHtml.includes('card.width,\n            card.height,\n            localOffsetX,\n            localOffsetY'),
   'WebGL card labels should be drawn with card parent dimensions and card-local offset so icon and tag deform with the card'
 );
-assert.ok(rawfileHtml.includes('localOffsetY,\n            card.twist'), 'WebGL card labels should inherit the deletion twist from the card surface');
+assert.ok(!rawfileHtml.includes('card.twist'), 'WebGL card labels should not inherit any deletion twist from the card surface');
 assert.ok(
   rawfileHtml.includes('const labelAlpha = card.labelAlpha === undefined ? (card.alpha > 0.01 ? 1 : 0) : card.labelAlpha;') &&
     rawfileHtml.includes('labelAlpha: isDismissedCard ? dismissFade : (alpha > 0.01 ? 1 : 0),'),
@@ -431,7 +522,7 @@ assert.ok(
 assert.ok(rawfileHtml.includes('state.height * 0.68'), 'WebGL recents cards should be scaled closer to the native reference proportions');
 
 const rootPreviewAssets = [
-  ['Background2.png', 'taskbar_up_webgl_background2.png'],
+  ['Background5.png', 'taskbar_up_webgl_background5.png'],
   ['Background3.png', 'taskbar_up_webgl_background3.png'],
   ['Card1.png', 'taskbar_up_webgl_card1.png'],
   ['Card2.png', 'taskbar_up_webgl_card2.png'],
