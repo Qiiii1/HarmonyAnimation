@@ -6,6 +6,7 @@
     "pages/TaskbarUpPage",
     "pages/TaskbarUpWebGLPage",
     "pages/UnlockDesktopPage",
+    "pages/UnlockDesktopDirectionalPage",
     "pages/TaskbarDownPage",
     "pages/config/AllConfigPage",
     "pages/config/IndexConfigPage",

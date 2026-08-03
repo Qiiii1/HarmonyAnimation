@@ -3,11 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const configPagePath = path.resolve('entry/src/main/ets/pages/config/TaskbarUpConfigPage.ets');
+const taskbarUpPagePath = path.resolve('entry/src/main/ets/pages/TaskbarUpPage.ets');
 const webglPagePath = path.resolve('entry/src/main/ets/pages/TaskbarUpWebGLPage.ets');
 const mainPagesPath = path.resolve('entry/src/main/resources/base/profile/main_pages.json');
 const rawfileHtmlPath = path.resolve('entry/src/main/resources/rawfile/taskbar_up_webgl.html');
 
 const configSource = fs.readFileSync(configPagePath, 'utf8');
+const taskbarUpSource = fs.readFileSync(taskbarUpPagePath, 'utf8');
 const mainPages = JSON.parse(fs.readFileSync(mainPagesPath, 'utf8'));
 
 assert.ok(
@@ -31,6 +33,19 @@ assert.ok(
   configSource.includes("Text('WebGL 预览')"),
   'TaskbarUpConfigPage should label the new WebGL entry'
 );
+assert.ok(taskbarUpSource.includes('private readonly CARD_COUNT: number = 6;'), 'TaskbarUpPage should include six task cards');
+assert.ok(taskbarUpSource.includes('private readonly INITIAL_CENTER_INDEX: number = 5;'), 'TaskbarUpPage should default to the rightmost task card');
+assert.ok(taskbarUpSource.includes('private readonly CARD_ORDER: number[] = [0, 1, 2, 3, 4, 5];'), 'TaskbarUpPage should keep all six task cards in order');
+for (const sourceFragment of [
+  "$r('app.media.card5')",
+  "$r('app.media.card6')",
+  "$r('app.media.icon5')",
+  "$r('app.media.icon6')",
+  "CARD5_LABEL: string = '喜马拉雅听'",
+  "CARD6_LABEL: string = '去哪儿旅游'",
+]) {
+  assert.ok(taskbarUpSource.includes(sourceFragment), `TaskbarUpPage should include ${sourceFragment}`);
+}
 
 assert.ok(fs.existsSync(webglPagePath), 'TaskbarUpWebGLPage should exist');
 const webglPageSource = fs.readFileSync(webglPagePath, 'utf8');
@@ -69,6 +84,16 @@ const rawTextureStart = rawfileHtml.indexOf(rawTextureMarker) + rawTextureMarker
 const rawTextureEnd = rawfileHtml.indexOf(';\n</script>', rawTextureStart);
 assert.ok(rawTextureStart >= rawTextureMarker.length && rawTextureEnd > rawTextureStart, 'WebGL rawfile should expose parseable inline raw texture data');
 const rawTextures = JSON.parse(rawfileHtml.slice(rawTextureStart, rawTextureEnd));
+assert.equal(rawTextures.cards.length, 6, 'WebGL rawfile should inline six card textures');
+assert.equal(rawTextures.icons.length, 6, 'WebGL rawfile should inline six app icon textures');
+assert.ok(
+  rawTextures.cards.every((texture) => texture.width === 334 && texture.height === 720),
+  'WebGL card textures should all use the optimized 334x720 preview size'
+);
+assert.ok(
+  rawTextures.icons.every((texture) => texture.width === 96 && texture.height === 96),
+  'WebGL app icon textures should all use the optimized 96x96 label size'
+);
 
 function countTransparentDarkMattePixels(texture) {
   const bytes = Buffer.from(texture.rgba, 'base64');
@@ -105,6 +130,10 @@ assert.ok(rawfileHtml.includes('window.beginTaskbarUpAsset'), 'WebGL rawfile sho
 assert.ok(rawfileHtml.includes('window.appendTaskbarUpAsset'), 'WebGL rawfile should append native asset chunks');
 assert.ok(rawfileHtml.includes('window.applyTaskbarUpAssetChunks'), 'WebGL rawfile should assemble native asset chunks');
 assert.ok(rawfileHtml.includes('TASKBAR_UP_REQUIRED_ASSET_IDS'), 'WebGL rawfile should know the complete native asset set');
+assert.ok(
+  rawfileHtml.includes('const TASKBAR_UP_REQUIRED_ASSET_IDS = ["background2", "background3", "card0", "card1", "card2", "card3", "card4", "card5"];'),
+  'WebGL rawfile should wait for all six card chunks when native asset injection is used'
+);
 assert.ok(rawfileHtml.includes('areTaskbarUpAssetChunksComplete'), 'WebGL rawfile should detect when all native asset chunks have arrived');
 assert.ok(rawfileHtml.includes('scheduleApplyTaskbarUpAssetChunks'), 'WebGL rawfile should auto-apply assets after the final chunk arrives');
 assert.ok(
@@ -168,8 +197,8 @@ assert.ok(
   'WebGL rawfile should inline RGBA texture bytes instead of an image URL'
 );
 assert.ok(
-  (rawfileHtml.match(/"rgba":"/g) || []).length >= 12,
-  'WebGL rawfile should inline sharp backgrounds, soft backgrounds, four cards, and four app icon raw texture payloads'
+  (rawfileHtml.match(/"rgba":"/g) || []).length >= 16,
+  'WebGL rawfile should inline sharp backgrounds, soft backgrounds, six cards, and six app icon raw texture payloads'
 );
 assert.ok(
   !rawfileHtml.includes('<img id="fallbackBackground2" src="resource://rawfile/taskbar_up_webgl_background2.png"') &&
@@ -191,8 +220,8 @@ assert.ok(!rawfileHtml.includes('<img id="fallbackBackground2" src="taskbar_up_w
 assert.ok(!rawfileHtml.includes('<img id="fallbackBackground3" src="taskbar_up_webgl_background3.png"'), 'WebGL fallback background3 image should not rely on a relative rawfile URL that can hang in Harmony WebView');
 assert.ok(!rawfileHtml.includes('assets/preview/'), 'WebGL rawfile should not rely on nested preview asset paths');
 assert.ok(
-  rawfileHtml.length < 24000000,
-  'WebGL rawfile should remain bounded even with high-resolution inline raw RGBA textures'
+  rawfileHtml.length < 26000000,
+  'WebGL rawfile should remain bounded even with six-card inline raw RGBA textures'
 );
 assert.ok(rawfileHtml.includes('markWebGLStarted'), 'WebGL rawfile should expose a guarded ready transition');
 assert.ok(
@@ -222,6 +251,12 @@ assert.ok(rawfileHtml.includes('float bendAbs = clamp(abs(uBend), 0.0, 1.0);'), 
 assert.ok(rawfileHtml.includes('float sideCurve ='), 'WebGL shader should use a smooth side curve for horizontal card deformation');
 assert.ok(rawfileHtml.includes('mix(0.96, 1.04, vEdgeLight)'), 'WebGL shader should keep horizontal swipe lighting within a narrow range');
 assert.ok(rawfileHtml.includes('const meshBend ='), 'WebGL layout should send a softened bend value to the shader during horizontal swipe');
+assert.ok(
+  rawfileHtml.includes('const bendDistance = soft(clamp(abs / 1.35, 0, 1));') &&
+    rawfileHtml.includes('const bendPower = mix(0.5, 1.55, bendDistance);') &&
+    !rawfileHtml.includes('const bendPower = clamp(1 - abs * 0.08, 0.72, 1);'),
+  'WebGL horizontal swipe should bend nearby focus cards lightly and distant side cards much more strongly'
+);
 assert.ok(rawfileHtml.includes('uniform float uTiltY;'), 'WebGL shader should expose a Y-axis tilt uniform for the reference horizontal swipe perspective');
 assert.ok(rawfileHtml.includes('uniform float uDepth;'), 'WebGL shader should expose card Z depth so horizontal swipe can move the card backward like the reference');
 assert.ok(rawfileHtml.includes('uniform float uPerspective;'), 'WebGL shader should project tilted cards with a CSS-like perspective');
@@ -329,6 +364,14 @@ assert.ok(rawfileHtml.includes('neighborShrink: 0'), 'WebGL rawfile should shrin
 assert.ok(rawfileHtml.includes('recentsExit: null'), 'WebGL rawfile should keep a dedicated recents exit state separate from the open progress');
 assert.ok(rawfileHtml.includes('const RECENTS_EXIT_MS = 260'), 'WebGL recents exit should be faster than the normal spring-driven enter animation');
 assert.ok(rawfileHtml.includes('const RECENTS_BACKGROUND_EXIT_MS = 420'), 'WebGL recents background should restore more slowly than the cards exit');
+assert.ok(
+  rawfileHtml.includes('const FOCUS_BREATH_AMPLITUDE = 2.0;') &&
+    rawfileHtml.includes('const FOCUS_BREATH_SPEED = 0.0032;') &&
+    rawfileHtml.includes('const PAN_DRAG_WIDTH_RATIO = 0.42;') &&
+    rawfileHtml.includes('const PAN_EDGE_RESISTANCE = 0.42;') &&
+    rawfileHtml.includes('const PAN_RELEASE_PROJECT = 4.8;'),
+  'WebGL focused card and horizontal pan should expose subtle natural motion tuning constants'
+);
 assert.ok(rawfileHtml.includes('mode = "undecided"'), 'WebGL rawfile should decide between horizontal pan and upward dismiss after recents are open');
 assert.ok(rawfileHtml.includes('mode === "pan"') && rawfileHtml.includes('mode === "dismiss"'), 'WebGL rawfile should model the reference pan and dismiss modes');
 assert.ok(
@@ -370,7 +413,14 @@ assert.ok(
     rawfileHtml.includes('const exitX = -state.width * (1.08 + 0.18 * (1 - exitOrder)) * exitProgress;'),
   'WebGL recents cards should exit faster from right to left instead of waiting for the desktop spring'
 );
-assert.ok(rawfileHtml.includes('frameDX') && rawfileHtml.includes('S.idxT - frameDX /'), 'WebGL rawfile should advance card index from per-frame horizontal movement');
+assert.ok(
+  rawfileHtml.includes('function panIndexDragRange()') &&
+    rawfileHtml.includes('function resistPanIndex(value, min, max)') &&
+    rawfileHtml.includes('S.panStartIndex - S.dragDX / dragRange') &&
+    rawfileHtml.includes('S.panVelocity += (frameIndexDelta - S.panVelocity) * 0.35;') &&
+    rawfileHtml.includes('const projectedIndex = S.idxT + clamp(S.panVelocity * PAN_RELEASE_PROJECT, -0.42, 0.42);'),
+  'WebGL rawfile should advance card index from absolute horizontal drag with elastic edges and release projection'
+);
 assert.ok(rawfileHtml.includes('S.bend +='), 'WebGL rawfile should animate bend from drag and index velocity');
 assert.ok(rawfileHtml.includes('cardSlots') && rawfileHtml.includes('cardSlotTargets'), 'WebGL rawfile should position cards with live slot and target slot arrays');
 assert.ok(rawfileHtml.includes('cardGone'), 'WebGL rawfile should remove dismissed cards without changing texture order');
@@ -434,11 +484,20 @@ assert.ok(
   'WebGL upward dismiss should drift the deleted card right only when it is close to deletion'
 );
 assert.ok(
+  rawfileHtml.includes('const focusSettled = clamp(') &&
+    rawfileHtml.includes('const focusBreathBase = (!dragging && !S.dismiss && !S.dismissCancel && !S.reflow && !recentsExitActive)') &&
+    rawfileHtml.includes('const focusBreathWave = Math.sin(time * FOCUS_BREATH_SPEED);') &&
+    rawfileHtml.includes('const focusBreathStrength = focusBreathBase * soft(clamp(1 - abs / 0.56, 0, 1));') &&
+    rawfileHtml.includes('const focusBreathY = focusBreathWave * FOCUS_BREATH_AMPLITUDE * (window.devicePixelRatio || 1) * focusBreathStrength;') &&
+    rawfileHtml.includes('+ entryY + lift + focusBreathY;'),
+  'WebGL focused card should breathe vertically only after pan settles, while labels follow the card mesh'
+);
+assert.ok(
   !rawfileHtml.includes('dragTargetX'),
   'WebGL rawfile should not use the old threshold-only dragTargetX interaction'
 );
 assert.ok(rawfileHtml.includes('const cardMetadata = ['), 'WebGL rawfile should keep card icon and label metadata in card order');
-for (const appLabel of ['小红书', '滴滴出行', '淘宝', '快手']) {
+for (const appLabel of ['小红书', '滴滴出行', '淘宝', '快手', '喜马拉雅听', '去哪儿旅游']) {
   assert.ok(rawfileHtml.includes(`label: "${appLabel}"`), `WebGL rawfile should expose the app label ${appLabel}`);
 }
 assert.ok(
@@ -516,8 +575,12 @@ assert.ok(
 );
 assert.ok(rawfileHtml.includes('const labelY = cardTop - 30 * S.prg;'), 'WebGL card labels should sit slightly lower above the card like the native reference');
 assert.ok(
-  rawfileHtml.includes('const dynamicGap = state.width * 0.70 - state.width * 0.045 * soft(panCurve);'),
-  'WebGL recents cards should sit closer together with a native-like horizontal gap'
+  rawfileHtml.includes('const dynamicGap = state.width * 0.70 - state.width * 0.045 * soft(panCurve);') &&
+    rawfileHtml.includes('function naturalCarouselRel(value)') &&
+    rawfileHtml.includes('const naturalRel = naturalCarouselRel(rawRel);') &&
+    rawfileHtml.includes('const focusFollowX = dragDirection * state.width * 0.024 * soft(panCurve) * soft(clamp(1 - abs / 0.68, 0, 1));') &&
+    rawfileHtml.includes('const xPos = naturalRel * dynamicGap + entryX + focusFollowX;'),
+  'WebGL recents cards should use a native-like horizontal gap with smoother carousel offset and focused-card follow-through'
 );
 assert.ok(rawfileHtml.includes('state.height * 0.68'), 'WebGL recents cards should be scaled closer to the native reference proportions');
 
@@ -528,6 +591,8 @@ const rootPreviewAssets = [
   ['Card2.png', 'taskbar_up_webgl_card2.png'],
   ['Card3.png', 'taskbar_up_webgl_card3.png'],
   ['Card4.png', 'taskbar_up_webgl_card4.png'],
+  ['card5.png', 'taskbar_up_webgl_card5.png'],
+  ['card6.png', 'taskbar_up_webgl_card6.png'],
 ];
 
 for (const [assetName, rootAssetName] of rootPreviewAssets) {
@@ -541,7 +606,7 @@ for (const [assetName, rootAssetName] of rootPreviewAssets) {
   );
 }
 
-for (const iconName of ['icon1.png', 'icon2.png', 'icon3.png', 'icon4.png']) {
+for (const iconName of ['icon1.png', 'icon2.png', 'icon3.png', 'icon4.png', 'icon5.png', 'icon6.png']) {
   const rootIconName = `taskbar_up_webgl_${iconName}`;
   assert.ok(rawfileHtml.includes(rootIconName), `WebGL rawfile should use root-level app icon asset ${rootIconName}`);
   assert.ok(

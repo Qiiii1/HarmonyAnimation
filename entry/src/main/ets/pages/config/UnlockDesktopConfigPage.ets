@@ -145,6 +145,16 @@ struct UnlockDesktopConfigPage {
     }
   }
 
+  private openDirectionalPreviewPage(): void {
+    try {
+      const options: UnlockDesktopPreviewRouteOptions = {
+        url: 'pages/UnlockDesktopDirectionalPage',
+      };
+      this.getUIContext().getRouter().pushUrl(options);
+    } catch (_error) {
+    }
+  }
+
   @Builder
   private buildHeader() {
     Column({ space: 10 }) {
@@ -330,6 +340,33 @@ struct UnlockDesktopConfigPage {
     )
   }
 
+  @Builder
+  private buildDirectionalPreviewButton() {
+    Stack() {
+      Text('方向响应预览')
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#FFFFFFFF')
+    }
+    .width('100%')
+    .height(54)
+    .backgroundColor('#24FFFFFF')
+    .borderRadius(20)
+    .border({
+      width: 1,
+      color: '#30FFFFFF'
+    })
+    .onClick(() => {
+      this.openDirectionalPreviewPage();
+    })
+    .gesture(
+      TapGesture({ count: 1 })
+        .onAction(() => {
+          this.openDirectionalPreviewPage();
+        })
+    )
+  }
+
   build() {
     Stack() {
       Image($r('app.media.Background2'))
@@ -369,6 +406,7 @@ struct UnlockDesktopConfigPage {
             this.buildPresetDetail()
             this.buildSabParameterColumn()
             this.buildPreviewButton()
+            this.buildDirectionalPreviewButton()
           }
           .width('100%')
           .padding(this.PANEL_PADDING)

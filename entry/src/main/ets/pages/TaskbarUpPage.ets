@@ -52,9 +52,9 @@ struct TaskbarUpPage {
   private verticalDragLeadCardVelocityPxPerMs: number = 0;
   private followerCardReleaseStartX: number = 0;
 
-  private readonly CARD_COUNT: number = 4;
-  private readonly INITIAL_CENTER_INDEX: number = 3;
-  private readonly CARD_ORDER: number[] = [0, 1, 2, 3];
+  private readonly CARD_COUNT: number = 6;
+  private readonly INITIAL_CENTER_INDEX: number = 5;
+  private readonly CARD_ORDER: number[] = [0, 1, 2, 3, 4, 5];
 
   // 页面动画参数。
   private readonly DURATION_MS: number = 1480;
@@ -167,6 +167,8 @@ struct TaskbarUpPage {
   private readonly CARD2_LABEL: string = '滴滴出行';
   private readonly CARD3_LABEL: string = '淘宝';
   private readonly CARD4_LABEL: string = '快手';
+  private readonly CARD5_LABEL: string = '喜马拉雅听';
+  private readonly CARD6_LABEL: string = '去哪儿旅游';
 
   private clamp(value: number, min: number, max: number): number {
     return Math.min(max, Math.max(min, value));
@@ -1351,8 +1353,12 @@ struct TaskbarUpPage {
         return $r('app.media.Card2');
       case 2:
         return $r('app.media.Card3');
-      default:
+      case 3:
         return $r('app.media.Card4');
+      case 4:
+        return $r('app.media.card5');
+      default:
+        return $r('app.media.card6');
     }
   }
 
@@ -1364,8 +1370,12 @@ struct TaskbarUpPage {
         return $r('app.media.icon2');
       case 2:
         return $r('app.media.icon3');
-      default:
+      case 3:
         return $r('app.media.icon4');
+      case 4:
+        return $r('app.media.icon5');
+      default:
+        return $r('app.media.icon6');
     }
   }
 
@@ -1377,8 +1387,12 @@ struct TaskbarUpPage {
         return this.CARD2_LABEL;
       case 2:
         return this.CARD3_LABEL;
-      default:
+      case 3:
         return this.CARD4_LABEL;
+      case 4:
+        return this.CARD5_LABEL;
+      default:
+        return this.CARD6_LABEL;
     }
   }
 
