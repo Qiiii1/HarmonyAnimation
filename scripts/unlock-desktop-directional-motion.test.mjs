@@ -33,6 +33,11 @@ this.unlockDirectionalOvershootDistance = unlockDirectionalOvershootDistance;
 this.unlockEaseOutProgress = unlockEaseOutProgress;
 this.unlockDirectionalPathCoordinate = unlockDirectionalPathCoordinate;
 this.unlockDirectionalPathLateralCoordinate = unlockDirectionalPathLateralCoordinate;
+this.unlockModuleDirectionProjection = unlockModuleDirectionProjection;
+this.unlockModuleArrivalEndProgress = unlockModuleArrivalEndProgress;
+this.unlockModuleArrivalProgress = unlockModuleArrivalProgress;
+this.unlockModuleArrivalOvershootScale = unlockModuleArrivalOvershootScale;
+this.unlockModuleArrivalStartScale = unlockModuleArrivalStartScale;
 this.unlockModuleDistanceFalloff = unlockModuleDistanceFalloff;`, context);
   return context;
 }
@@ -43,6 +48,11 @@ const {
   unlockEaseOutProgress,
   unlockDirectionalPathCoordinate,
   unlockDirectionalPathLateralCoordinate,
+  unlockModuleDirectionProjection,
+  unlockModuleArrivalEndProgress,
+  unlockModuleArrivalProgress,
+  unlockModuleArrivalOvershootScale,
+  unlockModuleArrivalStartScale,
   unlockModuleDistanceFalloff
 } = loadHelper();
 
@@ -88,6 +98,75 @@ for (let frame = 1; frame <= 100; frame += 1) {
   assert.ok(easeStep <= previousEaseStep + 0.000001, 'global easing speed must never increase');
   previousEaseStep = easeStep;
 }
+
+const moduleCenters = [
+  [0.3864, 0.3858],
+  [0.3906, 0.5039],
+  [0.7196, 0.4502],
+  [0.1580, 0.3824],
+  [0.1343, 0.5035],
+  [0.4996, 0.2052],
+  [0.6350, 0.6135],
+  [0.3829, 0.6218],
+  [0.8451, 0.6132],
+  [0.1423, 0.6183],
+  [0.4996, 0.8911],
+];
+
+function arrivalTimingForDirection(direction) {
+  const projections = moduleCenters.map(([centerXRatio, centerYRatio]) =>
+    unlockModuleDirectionProjection(centerXRatio, centerYRatio, direction.x, direction.y, 420, 900));
+  const minimumProjection = Math.min(...projections);
+  const maximumProjection = Math.max(...projections);
+  const arrivalEnds = projections.map((projection) => unlockModuleArrivalEndProgress(
+    projection,
+    minimumProjection,
+    maximumProjection,
+    0.5
+  ));
+  assertAlmostEqual(Math.min(...arrivalEnds), 0.5);
+  assertAlmostEqual(Math.max(...arrivalEnds), 1);
+  for (let firstIndex = 0; firstIndex < projections.length; firstIndex += 1) {
+    for (let secondIndex = 0; secondIndex < projections.length; secondIndex += 1) {
+      if (projections[firstIndex] > projections[secondIndex] + 0.000001) {
+        assert.ok(
+          arrivalEnds[firstIndex] > arrivalEnds[secondIndex],
+          'an icon farther along the swipe direction must arrive later'
+        );
+      }
+    }
+  }
+  return arrivalEnds;
+}
+
+const straightUpArrivalEnds = arrivalTimingForDirection(straightUp);
+assert.ok(
+  straightUpArrivalEnds[5] > straightUpArrivalEnds[10],
+  'the top icon must arrive after the bottom icon on a straight-up swipe'
+);
+arrivalTimingForDirection(diagonalRight);
+arrivalTimingForDirection(diagonalLeft);
+assert.ok(
+  unlockModuleDirectionProjection(0.5, 0.2, diagonalRight.x, diagonalRight.y, 420, 900) >
+    unlockModuleDirectionProjection(0.9, 0.5, diagonalRight.x, diagonalRight.y, 420, 900),
+  'direction projection must use physical screen dimensions on a portrait display'
+);
+assertAlmostEqual(unlockModuleArrivalEndProgress(0.25, 0, 1, 0.5), 0.5517578125);
+assertAlmostEqual(unlockModuleArrivalEndProgress(0.75, 0, 1, 0.5), 0.9482421875);
+assert.equal(unlockModuleArrivalProgress(0, 0.5), 0);
+assert.equal(unlockModuleArrivalProgress(0.5, 0.5), 1);
+assert.equal(unlockModuleArrivalProgress(1, 1), 1);
+assert.equal(unlockModuleArrivalProgress(1 / 3, 0.5), unlockEaseOutProgress(1 / 3));
+assert.ok(
+  unlockModuleArrivalProgress(0.45, 0.5) > unlockModuleArrivalProgress(0.45, 1),
+  'an earlier icon must be farther through the same easing curve at the same global time'
+);
+assertAlmostEqual(unlockModuleArrivalOvershootScale(0.5), 0.25);
+assert.equal(unlockModuleArrivalOvershootScale(1), 1);
+assertAlmostEqual(unlockModuleArrivalOvershootScale(0.5, 1.5), 0.25);
+assert.equal(unlockModuleArrivalOvershootScale(1, 1.5), 1.5);
+assertAlmostEqual(unlockModuleArrivalStartScale(0.5), 0.55);
+assert.equal(unlockModuleArrivalStartScale(1), 1);
 
 const pathStart = -520;
 const pathOvershoot = 60;
@@ -156,6 +235,51 @@ for (let frameCount = 2; frameCount <= 500; frameCount += 1) {
   assert.ok(sawReturn, `frame count ${frameCount} must include the overshoot return`);
 }
 
+for (const arrivalEndProgress of [0.5, 0.6, 0.7, 0.85, 1]) {
+  const arrivalOvershootScale = unlockModuleArrivalOvershootScale(arrivalEndProgress, 1.5);
+  const staggeredPathStart = pathStart * unlockModuleArrivalStartScale(arrivalEndProgress);
+  const staggeredPathOvershoot = pathOvershoot * arrivalOvershootScale;
+  const staggeredPathTurnLateralOffset = pathTurnLateralOffset * arrivalOvershootScale;
+  for (let frameCount = 2; frameCount <= 500; frameCount += 1) {
+    let previousDirectional = staggeredPathStart;
+    let previousLateral = 0;
+    let previousTotalStep = Number.POSITIVE_INFINITY;
+    for (let frame = 1; frame <= frameCount; frame += 1) {
+      const arrivalProgress = unlockModuleArrivalProgress(frame / frameCount, arrivalEndProgress);
+      const directional = unlockDirectionalPathCoordinate(
+        arrivalProgress,
+        staggeredPathStart,
+        staggeredPathOvershoot,
+        pathTurnProgress
+      );
+      const lateral = unlockDirectionalPathLateralCoordinate(
+        arrivalProgress,
+        staggeredPathStart,
+        staggeredPathOvershoot,
+        staggeredPathTurnLateralOffset,
+        pathTurnProgress
+      );
+      const totalStep = Math.hypot(
+        directional - previousDirectional,
+        lateral - previousLateral
+      );
+      assert.ok(
+        totalStep <= previousTotalStep + 0.000001,
+        `staggered icon speed must not increase for end ${arrivalEndProgress} at frame ${frame}/${frameCount}`
+      );
+      previousDirectional = directional;
+      previousLateral = lateral;
+      previousTotalStep = totalStep;
+    }
+  }
+}
+
+const defaultTotalDurationMs = 750;
+const defaultModuleDelayMs = Math.floor(defaultTotalDurationMs * 0.22);
+const defaultModuleDurationMs = defaultTotalDurationMs - defaultModuleDelayMs;
+assertAlmostEqual(defaultModuleDelayMs + defaultModuleDurationMs * 0.5, 457.5);
+assert.equal(defaultModuleDelayMs + defaultModuleDurationMs, defaultTotalDurationMs);
+
 const defaultFrameSteps = [];
 let previousDefaultCoordinate = pathStart;
 for (let frame = 1; frame <= 70; frame += 1) {
@@ -194,8 +318,15 @@ assert.ok(pageSource.includes('unlockDirectionalPathLateralCoordinate('));
 assert.ok(pageSource.includes("import { AnimatorResult } from '@kit.ArkUI';"));
 assert.ok(pageSource.includes('this.getUIContext().createAnimator({'));
 assert.ok(pageSource.includes("easing: 'linear'"));
-assert.ok(pageSource.includes('const easedProgress = unlockEaseOutProgress(value);'));
-assert.ok(pageSource.includes('this.moduleMotionProgress = easedProgress;'));
+assert.ok(pageSource.includes('this.moduleTimelineProgress = value;'));
+assert.ok(pageSource.includes('unlockModuleArrivalEndProgress('));
+assert.ok(pageSource.includes('unlockModuleArrivalProgress('));
+assert.ok(pageSource.includes('this.moduleArrivalEndProgress(centerXRatio, centerYRatio)'));
+assert.ok(pageSource.includes('this.updateModuleArrivalProjectionRange();'));
+assert.ok(pageSource.includes('@State unlockDirectionalStaggeredArrival: boolean = false;'));
+assert.ok(pageSource.includes('this.unlockDirectionalStaggeredArrival'));
+assert.ok(pageSource.includes('this.getUIContext().getRouter().getParams()'));
+assert.ok(pageSource.includes('this.unlockDirectionalStaggeredArrival = params.staggeredArrival === true;'));
 assert.ok(!pageSource.includes('modulePathLookup'));
 assert.ok(!pageSource.includes('unlockQuadraticPathParameter'));
 assert.ok(pageSource.includes('this.moduleAnimator.onFrame = (value: number): void => {'));
@@ -214,6 +345,14 @@ assert.ok(pageSource.includes('MODULE_START_SCALE: number = 0.88'));
 assert.ok(pageSource.includes('MODULE_START_OFFSET: number = -520'));
 assert.ok(pageSource.includes('MODULE_TURN_PROGRESS: number = 0.4980680286858419'));
 assert.ok(pageSource.includes('MODULE_TURN_LATERAL_OFFSET: number = 12'));
+assert.ok(pageSource.includes('MODULE_EARLIEST_ARRIVAL_PROGRESS: number = 0.5'));
+assert.ok(pageSource.includes('MODULE_STAGGERED_MAX_OVERSHOOT_SCALE: number = 1.5'));
+assert.ok(pageSource.includes('unlockModuleArrivalOvershootScale('));
+assert.ok(pageSource.includes(
+  'this.unlockDirectionalStaggeredArrival ? this.MODULE_STAGGERED_MAX_OVERSHOOT_SCALE : 1'
+));
+assert.ok(pageSource.includes('private moduleStartOffsetFor(centerXRatio: number, centerYRatio: number): number'));
+assert.ok(pageSource.includes('return this.MODULE_START_OFFSET *'));
 assert.ok(pageSource.includes('private moduleMotionDurationMs(): number'));
 assert.ok(
   pageSource.includes('return Math.max(1, this.totalUnlockDurationMs() - this.moduleStartDelayMs());'),
@@ -238,12 +377,16 @@ assert.ok(!pageSource.includes('private moduleForwardDurationMs(): number'));
 assert.ok(!pageSource.includes('private moduleReturnDurationMs(): number'));
 assert.ok(!pageSource.includes('private moduleFadeInDurationMs(): number'));
 assert.equal(pageSource.match(/this\.moduleAnimator\.play\(\);/g)?.length, 1);
-assert.equal(pageSource.match(/this\.moduleMotionProgress = 1;/g)?.length ?? 0, 0);
+assert.equal(pageSource.match(/createAnimator\(\{/g)?.length, 1);
+assert.equal(pageSource.match(/this\.moduleTimelineProgress = 1;/g)?.length ?? 0, 0);
 assert.ok(!pageSource.includes('curves.springMotion'), 'the return should not switch to a spring curve');
 
 const configSource = fs.readFileSync(configPath, 'utf8');
 assert.ok(configSource.includes("url: 'pages/UnlockDesktopDirectionalPage'"));
-assert.ok(configSource.includes("Text('方向响应预览')"));
+assert.ok(configSource.includes('private openDirectionalPreviewPage(staggeredArrival: boolean): void'));
+assert.ok(configSource.includes('staggeredArrival: staggeredArrival'));
+assert.ok(configSource.includes("this.buildDirectionalPreviewButton('方向响应 · 同时到达', false)"));
+assert.ok(configSource.includes("this.buildDirectionalPreviewButton('方向响应 · 错峰到达', true)"));
 
 const routes = JSON.parse(fs.readFileSync(routesPath, 'utf8'));
 assert.ok(routes.src.includes('pages/UnlockDesktopDirectionalPage'));

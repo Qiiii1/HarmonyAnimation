@@ -4,10 +4,18 @@ import {
   unlockDirectionalPathCoordinate,
   unlockDirectionalPathLateralCoordinate,
   unlockDirectionalOvershootDistance,
-  unlockEaseOutProgress,
+  unlockModuleArrivalEndProgress,
+  unlockModuleArrivalOvershootScale,
+  unlockModuleArrivalProgress,
+  unlockModuleArrivalStartScale,
+  unlockModuleDirectionProjection,
   unlockModuleDistanceFalloff,
   unlockReleaseDirection,
 } from './UnlockDesktopDirectionalMotion';
+
+interface UnlockDesktopDirectionalRouteParams {
+  staggeredArrival: boolean;
+}
 
 @Entry
 @Component
@@ -15,11 +23,10 @@ struct UnlockDesktopDirectionalPage {
   @State pageWidth: number = 1;
   @State pageHeight: number = 1;
   @State progress: number = 0;
-  @State moduleOpacityValue: number = 0;
-  @State moduleScaleValue: number = 0.88;
-  @State moduleMotionProgress: number = 0;
+  @State moduleTimelineProgress: number = 0;
   @State dragging: boolean = false;
   @State animating: boolean = false;
+  @State unlockDirectionalStaggeredArrival: boolean = false;
   @StorageLink('unlockDragFollowFactor') unlockDragFollowFactor: number = 1.5;
   @StorageLink('unlockToHomeDurationMs') unlockToHomeDurationMs: number = 750;
   @StorageLink('unlockIconReboundPercent') unlockIconReboundPercent: number = 15;
@@ -35,6 +42,8 @@ struct UnlockDesktopDirectionalPage {
   private releaseTouchY: number = 0;
   private animationToken: number = 0;
   private moduleAnimator: AnimatorResult | undefined = undefined;
+  private moduleArrivalMinimumProjection: number = 0;
+  private moduleArrivalMaximumProjection: number = 0;
 
   private readonly UNLOCK_DRAG_DISTANCE: number = 520;
   private readonly UNLOCK_COMPLETE_THRESHOLD: number = 0.34;
@@ -47,6 +56,14 @@ struct UnlockDesktopDirectionalPage {
   private readonly MODULE_START_OFFSET: number = -520;
   private readonly MODULE_TURN_PROGRESS: number = 0.4980680286858419;
   private readonly MODULE_TURN_LATERAL_OFFSET: number = 12;
+  private readonly MODULE_EARLIEST_ARRIVAL_PROGRESS: number = 0.5;
+  private readonly MODULE_STAGGERED_MAX_OVERSHOOT_SCALE: number = 1.5;
+  private readonly MODULE_CENTER_X_RATIOS: number[] = [
+    0.3864, 0.3906, 0.7196, 0.1580, 0.1343, 0.4996, 0.6350, 0.3829, 0.8451, 0.1423, 0.4996
+  ];
+  private readonly MODULE_CENTER_Y_RATIOS: number[] = [
+    0.3858, 0.5039, 0.4502, 0.3824, 0.5035, 0.2052, 0.6135, 0.6218, 0.6132, 0.6183, 0.8911
+  ];
 
   private clamp(value: number, min: number, max: number): number {
     return Math.min(max, Math.max(min, value));
@@ -111,30 +128,108 @@ struct UnlockDesktopDirectionalPage {
     return Math.max(1, this.totalUnlockDurationMs() - this.moduleStartDelayMs());
   }
 
-  private moduleOvershootDistance(): number {
-    return unlockDirectionalOvershootDistance(this.unlockIconReboundPercent);
-  }
-
   private resetModuleEntrance(): void {
     this.stopModuleAnimator();
-    this.moduleOpacityValue = 0;
-    this.moduleScaleValue = this.MODULE_START_SCALE;
-    this.moduleMotionProgress = 0;
+    this.moduleTimelineProgress = 0;
   }
 
   private updateReleaseDirection(): void {
     const direction = unlockReleaseDirection(this.dragDeltaX, this.dragDeltaY, this.DIRECTION_DEAD_ZONE);
     this.releaseDirectionX = direction.x;
     this.releaseDirectionY = direction.y;
+    this.updateModuleArrivalProjectionRange();
+  }
+
+  private moduleDirectionProjection(centerXRatio: number, centerYRatio: number): number {
+    return unlockModuleDirectionProjection(
+      centerXRatio,
+      centerYRatio,
+      this.releaseDirectionX,
+      this.releaseDirectionY,
+      this.fullFrameWidth(),
+      this.fullFrameHeight()
+    );
+  }
+
+  private updateModuleArrivalProjectionRange(): void {
+    const firstProjection = this.moduleDirectionProjection(
+      this.MODULE_CENTER_X_RATIOS[0],
+      this.MODULE_CENTER_Y_RATIOS[0]
+    );
+    let minimumProjection = firstProjection;
+    let maximumProjection = firstProjection;
+    for (let index = 1; index < this.MODULE_CENTER_X_RATIOS.length; index += 1) {
+      const projection = this.moduleDirectionProjection(
+        this.MODULE_CENTER_X_RATIOS[index],
+        this.MODULE_CENTER_Y_RATIOS[index]
+      );
+      minimumProjection = Math.min(minimumProjection, projection);
+      maximumProjection = Math.max(maximumProjection, projection);
+    }
+    this.moduleArrivalMinimumProjection = minimumProjection;
+    this.moduleArrivalMaximumProjection = maximumProjection;
+  }
+
+  private moduleArrivalEndProgress(centerXRatio: number, centerYRatio: number): number {
+    if (!this.unlockDirectionalStaggeredArrival) {
+      return 1;
+    }
+    return unlockModuleArrivalEndProgress(
+      this.moduleDirectionProjection(centerXRatio, centerYRatio),
+      this.moduleArrivalMinimumProjection,
+      this.moduleArrivalMaximumProjection,
+      this.MODULE_EARLIEST_ARRIVAL_PROGRESS
+    );
+  }
+
+  private moduleArrivalProgress(centerXRatio: number, centerYRatio: number): number {
+    return unlockModuleArrivalProgress(
+      this.moduleTimelineProgress,
+      this.moduleArrivalEndProgress(centerXRatio, centerYRatio)
+    );
+  }
+
+  private moduleArrivalOvershootScale(centerXRatio: number, centerYRatio: number): number {
+    return unlockModuleArrivalOvershootScale(
+      this.moduleArrivalEndProgress(centerXRatio, centerYRatio),
+      this.unlockDirectionalStaggeredArrival ? this.MODULE_STAGGERED_MAX_OVERSHOOT_SCALE : 1
+    );
+  }
+
+  private moduleOvershootDistanceFor(centerXRatio: number, centerYRatio: number): number {
+    return unlockDirectionalOvershootDistance(this.unlockIconReboundPercent) *
+      this.moduleArrivalOvershootScale(centerXRatio, centerYRatio);
+  }
+
+  private moduleStartOffsetFor(centerXRatio: number, centerYRatio: number): number {
+    return this.MODULE_START_OFFSET *
+      unlockModuleArrivalStartScale(
+        this.moduleArrivalEndProgress(centerXRatio, centerYRatio)
+      );
+  }
+
+  private moduleTurnLateralOffsetFor(centerXRatio: number, centerYRatio: number): number {
+    return this.MODULE_TURN_LATERAL_OFFSET *
+      this.moduleArrivalOvershootScale(centerXRatio, centerYRatio);
+  }
+
+  private moduleOpacityValueFor(centerXRatio: number, centerYRatio: number): number {
+    return this.clamp(this.moduleArrivalProgress(centerXRatio, centerYRatio) / 0.32, 0, 1);
+  }
+
+  private moduleScaleValueFor(centerXRatio: number, centerYRatio: number): number {
+    return this.lerp(
+      this.MODULE_START_SCALE,
+      1,
+      this.moduleArrivalProgress(centerXRatio, centerYRatio)
+    );
   }
 
   private prepareModuleStartPosition(): void {
     // Start well behind the gesture, then travel through the home position in the swipe direction.
     // For a right-up swipe this places the icons down-left before they move right-up.
     this.stopModuleAnimator();
-    this.moduleOpacityValue = 0;
-    this.moduleScaleValue = this.MODULE_START_SCALE;
-    this.moduleMotionProgress = 0;
+    this.moduleTimelineProgress = 0;
   }
 
   private playDirectionalModuleEntrance(token: number): void {
@@ -156,14 +251,7 @@ struct UnlockDesktopDirectionalPage {
       if (token !== this.animationToken) {
         return;
       }
-      const easedProgress = unlockEaseOutProgress(value);
-      this.moduleMotionProgress = easedProgress;
-      this.moduleOpacityValue = this.clamp(easedProgress / 0.32, 0, 1);
-      this.moduleScaleValue = this.lerp(
-        this.MODULE_START_SCALE,
-        1,
-        easedProgress
-      );
+      this.moduleTimelineProgress = value;
     };
     this.moduleAnimator.onFinish = (): void => {
       // Keep the completed animator alive until the next gesture or page teardown.
@@ -181,6 +269,11 @@ struct UnlockDesktopDirectionalPage {
     }
   }
 
+  aboutToAppear(): void {
+    const params = this.getUIContext().getRouter().getParams() as UnlockDesktopDirectionalRouteParams;
+    this.unlockDirectionalStaggeredArrival = params.staggeredArrival === true;
+  }
+
   aboutToDisappear(): void {
     this.animationToken += 1;
     this.stopModuleAnimator();
@@ -192,18 +285,21 @@ struct UnlockDesktopDirectionalPage {
     motionFactor: number
   ): number {
     const response = this.moduleDistanceFalloff(centerXRatio, centerYRatio) * motionFactor;
-    const overshootDistance = this.moduleOvershootDistance();
+    const startOffset = this.moduleStartOffsetFor(centerXRatio, centerYRatio);
+    const overshootDistance = this.moduleOvershootDistanceFor(centerXRatio, centerYRatio);
+    const turnLateralOffset = this.moduleTurnLateralOffsetFor(centerXRatio, centerYRatio);
+    const arrivalProgress = this.moduleArrivalProgress(centerXRatio, centerYRatio);
     const directionalCoordinate = unlockDirectionalPathCoordinate(
-      this.moduleMotionProgress,
-      this.MODULE_START_OFFSET,
+      arrivalProgress,
+      startOffset,
       overshootDistance,
       this.MODULE_TURN_PROGRESS
     );
     const lateralCoordinate = unlockDirectionalPathLateralCoordinate(
-      this.moduleMotionProgress,
-      this.MODULE_START_OFFSET,
+      arrivalProgress,
+      startOffset,
       overshootDistance,
-      this.MODULE_TURN_LATERAL_OFFSET,
+      turnLateralOffset,
       this.MODULE_TURN_PROGRESS
     );
     return (this.releaseDirectionX * directionalCoordinate -
@@ -216,18 +312,21 @@ struct UnlockDesktopDirectionalPage {
     motionFactor: number
   ): number {
     const response = this.moduleDistanceFalloff(centerXRatio, centerYRatio) * motionFactor;
-    const overshootDistance = this.moduleOvershootDistance();
+    const startOffset = this.moduleStartOffsetFor(centerXRatio, centerYRatio);
+    const overshootDistance = this.moduleOvershootDistanceFor(centerXRatio, centerYRatio);
+    const turnLateralOffset = this.moduleTurnLateralOffsetFor(centerXRatio, centerYRatio);
+    const arrivalProgress = this.moduleArrivalProgress(centerXRatio, centerYRatio);
     const directionalCoordinate = unlockDirectionalPathCoordinate(
-      this.moduleMotionProgress,
-      this.MODULE_START_OFFSET,
+      arrivalProgress,
+      startOffset,
       overshootDistance,
       this.MODULE_TURN_PROGRESS
     );
     const lateralCoordinate = unlockDirectionalPathLateralCoordinate(
-      this.moduleMotionProgress,
-      this.MODULE_START_OFFSET,
+      arrivalProgress,
+      startOffset,
       overshootDistance,
-      this.MODULE_TURN_LATERAL_OFFSET,
+      turnLateralOffset,
       this.MODULE_TURN_PROGRESS
     );
     return this.MODULE_GLOBAL_OFFSET_Y + (this.releaseDirectionY * directionalCoordinate +
@@ -341,10 +440,10 @@ struct UnlockDesktopDirectionalPage {
       .width(this.fullFrameWidth())
       .height(this.fullFrameHeight())
       .objectFit(ImageFit.Fill)
-      .opacity(this.moduleOpacityValue)
+      .opacity(this.moduleOpacityValueFor(centerXRatio, centerYRatio))
       .scale({
-        x: this.moduleScaleValue,
-        y: this.moduleScaleValue,
+        x: this.moduleScaleValueFor(centerXRatio, centerYRatio),
+        y: this.moduleScaleValueFor(centerXRatio, centerYRatio),
         centerX: `${centerXRatio * 100}%`,
         centerY: `${centerYRatio * 100}%`
       })

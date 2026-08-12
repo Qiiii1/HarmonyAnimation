@@ -34,6 +34,88 @@ export function unlockEaseOutProgress(progress: number): number {
   return 1 - Math.pow(1 - normalizedProgress, 1.7);
 }
 
+export function unlockModuleDirectionProjection(
+  centerXRatio: number,
+  centerYRatio: number,
+  directionX: number,
+  directionY: number,
+  pageWidth: number,
+  pageHeight: number
+): number {
+  const centerOffsetX = (centerXRatio - 0.5) * Math.max(pageWidth, 1);
+  const centerOffsetY = (centerYRatio - 0.5) * Math.max(pageHeight, 1);
+  const directionLength = Math.sqrt(directionX * directionX + directionY * directionY);
+  if (directionLength < 0.0001) {
+    return -centerOffsetY;
+  }
+  return centerOffsetX * directionX / directionLength +
+    centerOffsetY * directionY / directionLength;
+}
+
+export function unlockModuleArrivalEndProgress(
+  directionProjection: number,
+  minimumProjection: number,
+  maximumProjection: number,
+  earliestEndProgress: number = 0.8
+): number {
+  const earliest = clampUnlockMotion(earliestEndProgress, 0.5, 1);
+  const projectionRange = maximumProjection - minimumProjection;
+  if (projectionRange < 0.0001) {
+    return 1;
+  }
+  const directionRank = clampUnlockMotion(
+    (directionProjection - minimumProjection) / projectionRange,
+    0,
+    1
+  );
+  const emphasizedRank = directionRank * directionRank * directionRank *
+    (directionRank * (directionRank * 6 - 15) + 10);
+  return earliest + (1 - earliest) * emphasizedRank;
+}
+
+export function unlockModuleArrivalProgress(
+  rawTimelineProgress: number,
+  arrivalEndProgress: number
+): number {
+  const pathTurnTimelineProgress = 1 / 3;
+  const rawProgress = clampUnlockMotion(rawTimelineProgress, 0, 1);
+  if (rawProgress <= pathTurnTimelineProgress) {
+    return unlockEaseOutProgress(rawProgress);
+  }
+  const normalizedEndProgress = clampUnlockMotion(
+    arrivalEndProgress,
+    pathTurnTimelineProgress + 0.05,
+    1
+  );
+  const settleTimelineProgress = pathTurnTimelineProgress +
+    (rawProgress - pathTurnTimelineProgress) * (1 - pathTurnTimelineProgress) /
+      (normalizedEndProgress - pathTurnTimelineProgress);
+  return unlockEaseOutProgress(clampUnlockMotion(settleTimelineProgress, 0, 1));
+}
+
+export function unlockModuleArrivalOvershootScale(
+  arrivalEndProgress: number,
+  maximumOvershootScale: number = 1
+): number {
+  const pathTurnTimelineProgress = 1 / 3;
+  const normalizedEndProgress = clampUnlockMotion(
+    arrivalEndProgress,
+    pathTurnTimelineProgress + 0.05,
+    1
+  );
+  const timingScale = (normalizedEndProgress - pathTurnTimelineProgress) /
+    (1 - pathTurnTimelineProgress);
+  const arrivalRank = clampUnlockMotion((normalizedEndProgress - 0.5) / 0.5, 0, 1);
+  const normalizedMaximumOvershootScale = clampUnlockMotion(maximumOvershootScale, 1, 2);
+  const overshootBoost = 1 + (normalizedMaximumOvershootScale - 1) * arrivalRank;
+  return timingScale * overshootBoost;
+}
+
+export function unlockModuleArrivalStartScale(arrivalEndProgress: number): number {
+  const normalizedEndProgress = clampUnlockMotion(arrivalEndProgress, 0.5, 1);
+  return 0.1 + normalizedEndProgress * 0.9;
+}
+
 function unlockHermiteCoordinate(
   progress: number,
   startCoordinate: number,

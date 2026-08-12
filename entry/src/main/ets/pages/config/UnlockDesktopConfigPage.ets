@@ -8,6 +8,11 @@ import {
 
 interface UnlockDesktopPreviewRouteOptions {
   url: string;
+  params?: UnlockDesktopDirectionalRouteParams;
+}
+
+interface UnlockDesktopDirectionalRouteParams {
+  staggeredArrival: boolean;
 }
 
 @Entry
@@ -145,10 +150,13 @@ struct UnlockDesktopConfigPage {
     }
   }
 
-  private openDirectionalPreviewPage(): void {
+  private openDirectionalPreviewPage(staggeredArrival: boolean): void {
     try {
       const options: UnlockDesktopPreviewRouteOptions = {
         url: 'pages/UnlockDesktopDirectionalPage',
+        params: {
+          staggeredArrival: staggeredArrival
+        }
       };
       this.getUIContext().getRouter().pushUrl(options);
     } catch (_error) {
@@ -341,9 +349,9 @@ struct UnlockDesktopConfigPage {
   }
 
   @Builder
-  private buildDirectionalPreviewButton() {
+  private buildDirectionalPreviewButton(label: string, staggeredArrival: boolean) {
     Stack() {
-      Text('方向响应预览')
+      Text(label)
         .fontSize(17)
         .fontWeight(FontWeight.Bold)
         .fontColor('#FFFFFFFF')
@@ -357,14 +365,8 @@ struct UnlockDesktopConfigPage {
       color: '#30FFFFFF'
     })
     .onClick(() => {
-      this.openDirectionalPreviewPage();
+      this.openDirectionalPreviewPage(staggeredArrival);
     })
-    .gesture(
-      TapGesture({ count: 1 })
-        .onAction(() => {
-          this.openDirectionalPreviewPage();
-        })
-    )
   }
 
   build() {
@@ -406,7 +408,8 @@ struct UnlockDesktopConfigPage {
             this.buildPresetDetail()
             this.buildSabParameterColumn()
             this.buildPreviewButton()
-            this.buildDirectionalPreviewButton()
+            this.buildDirectionalPreviewButton('方向响应 · 同时到达', false)
+            this.buildDirectionalPreviewButton('方向响应 · 错峰到达', true)
           }
           .width('100%')
           .padding(this.PANEL_PADDING)
