@@ -8,6 +8,11 @@ import {
 
 interface TaskbarDownPreviewRouteOptions {
   url: string;
+  params?: TaskbarDownDirectionalRouteParams;
+}
+
+interface TaskbarDownDirectionalRouteParams {
+  staggeredArrival: boolean;
 }
 
 @Entry
@@ -139,6 +144,19 @@ struct TaskbarDownConfigPage {
     try {
       const options: TaskbarDownPreviewRouteOptions = {
         url: 'pages/TaskbarDownPage',
+      };
+      this.getUIContext().getRouter().pushUrl(options);
+    } catch (_error) {
+    }
+  }
+
+  private openDirectionalPreviewPage(staggeredArrival: boolean): void {
+    try {
+      const options: TaskbarDownPreviewRouteOptions = {
+        url: 'pages/TaskbarDownDirectionalPage',
+        params: {
+          staggeredArrival: staggeredArrival
+        }
       };
       this.getUIContext().getRouter().pushUrl(options);
     } catch (_error) {
@@ -330,6 +348,33 @@ struct TaskbarDownConfigPage {
     )
   }
 
+  @Builder
+  private buildDirectionalPreviewButton(label: string, staggeredArrival: boolean) {
+    Stack() {
+      Text(label)
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#FFFFFFFF')
+    }
+    .width('100%')
+    .height(54)
+    .backgroundColor('#24FFFFFF')
+    .borderRadius(20)
+    .border({
+      width: 1,
+      color: '#30FFFFFF'
+    })
+    .onClick(() => {
+      this.openDirectionalPreviewPage(staggeredArrival);
+    })
+    .gesture(
+      TapGesture({ count: 1 })
+        .onAction(() => {
+          this.openDirectionalPreviewPage(staggeredArrival);
+        })
+    )
+  }
+
   build() {
     Stack() {
       Image($r('app.media.Background2'))
@@ -369,6 +414,8 @@ struct TaskbarDownConfigPage {
             this.buildPresetDetail()
             this.buildSabParameterColumn()
             this.buildPreviewButton()
+            this.buildDirectionalPreviewButton('方向曲线 · 同步到达', false)
+            this.buildDirectionalPreviewButton('方向曲线 · 错峰到达', true)
           }
           .width('100%')
           .padding(this.PANEL_PADDING)

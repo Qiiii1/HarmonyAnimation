@@ -8,6 +8,7 @@
     "pages/UnlockDesktopPage",
     "pages/UnlockDesktopDirectionalPage",
     "pages/TaskbarDownPage",
+    "pages/TaskbarDownDirectionalPage",
     "pages/config/AllConfigPage",
     "pages/config/IndexConfigPage",
     "pages/config/VolumeConfigPage",

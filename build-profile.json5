@@ -7,11 +7,11 @@
         "material": {
           "certpath": "/Users/liqi/.ohos/config/default_HarmonyAnimation_eaeD7Y6pr0HWMcPEWuMzIjOUWDbxB2Eu-8lk_YkOxDE=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001AA2654A96F3FEDE41DD9F22E73D8A6DCA75DE6F0395D1E0FF2CC0954661FED4AC839E5F795D41",
+          "keyPassword": "0000001A29524B411E7F13AC7BE519245D3EB2C5D76D6BE994F647AE2330EBA94652E04BCBA255D79A18",
           "profile": "/Users/liqi/.ohos/config/default_HarmonyAnimation_eaeD7Y6pr0HWMcPEWuMzIjOUWDbxB2Eu-8lk_YkOxDE=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "/Users/liqi/.ohos/config/default_HarmonyAnimation_eaeD7Y6pr0HWMcPEWuMzIjOUWDbxB2Eu-8lk_YkOxDE=.p12",
-          "storePassword": "0000001AAEF773D355DD02076381E0111F6276EB236B684CB4247F927ECFF0ACCD72516CA0D53C863BC6"
+          "storePassword": "0000001A1680ED7F5480E759A711143CA34BE74A512688A98DFD089678BDAE557388D1A9AD2CC2A88F8E"
         }
       }
     ],
