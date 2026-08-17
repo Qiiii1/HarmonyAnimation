@@ -11,10 +11,14 @@ import {
   unlockModuleDirectionProjection,
   unlockModuleDistanceFalloff
 } from './UnlockDesktopDirectionalMotion';
-import { taskbarDownReleaseDirection } from './TaskbarDownDirectionalMotion';
+import {
+  taskbarDownNoOvershootCoordinate,
+  taskbarDownReleaseDirection
+} from './TaskbarDownDirectionalMotion';
 
 interface TaskbarDownDirectionalRouteParams {
   staggeredArrival: boolean;
+  overshootEnabled: boolean;
 }
 
 @Entry
@@ -28,7 +32,9 @@ struct TaskbarDownDirectionalPage {
   @State dragging: boolean = false;
   @State animating: boolean = false;
   @State closingVertically: boolean = false;
+  @State iconCloseScale: number = 1;
   @State staggeredArrival: boolean = false;
+  @State overshootEnabled: boolean = true;
   @StorageLink('taskbarDownOpenDragDampingRatio') openDragDampingRatio: number = 1.5;
   @StorageLink('taskbarDownModuleEnterDurationMs') moduleEnterTotalDurationMs: number = 750;
   @StorageLink('taskbarDownModuleReboundPercent') moduleReboundPercent: number = 2;
@@ -59,9 +65,9 @@ struct TaskbarDownDirectionalPage {
   private readonly DRAG_MODE_OPEN_FOLLOW: number = 2;
   private readonly DRAG_MODE_CLOSE: number = 3;
   private readonly POST_OPEN_DIRECTION_THRESHOLD: number = 6;
-  private readonly BACKGROUND_STAGE_DURATION_MS: number = 260;
+  private readonly BACKGROUND_STAGE_DURATION_MS: number = 420;
   private readonly BACKGROUND_BLUR_STAGE_DURATION_MS: number = 420;
-  private readonly PANEL_CLOSE_DURATION_MS: number = 280;
+  private readonly PANEL_CLOSE_DURATION_MS: number = 420;
   private readonly OPEN_TAP_MOVE_TOLERANCE: number = 12;
 
   // 与原下拉任务栏保持相同的背景参数。
@@ -69,9 +75,10 @@ struct TaskbarDownDirectionalPage {
   private readonly BACKGROUND_BLUR_OPACITY: number = 1;
   private readonly BACKGROUND_BLACK_WASH_OPACITY: number = 0.22;
   private readonly BACKGROUND_EFFECT_END_PROGRESS: number = 0.82;
-  private readonly BACKGROUND3_END_SCALE: number = 0.92;
+  private readonly BACKGROUND3_END_SCALE: number = 0.89;
   private readonly BACKGROUND3_END_RADIUS: number = 28;
   private readonly BACKGROUND_BLUR_OVERSCAN_SCALE: number = 1.05;
+  private readonly BACKGROUND3_BLUR_PADDING: number = 168;
 
   // 方向运动沿用创意上滑解锁桌面的轨迹模型：反方向入场、顺势过冲、回到终点。
   private readonly DIRECTION_DEAD_ZONE: number = 18;
@@ -84,8 +91,10 @@ struct TaskbarDownDirectionalPage {
   private readonly ICON_MIN_DISTANCE_RESPONSE: number = 0.68;
   private readonly ICON_BOTTOM_TRAVEL_BOOST: number = 0.18;
   private readonly ICON_CLOSE_OFFSET_Y: number = -360;
-  private readonly ICON_MAX_X_COMPRESSION: number = 0.06;
-  private readonly ICON_OVERSHOOT_DISTANCE_SCALE: number = 0.70;
+  private readonly ICON_MAX_X_COMPRESSION: number = 0.03;
+  private readonly ICON_CLOSE_END_SCALE: number = 0.96;
+  private readonly ICON_CLOSE_Y_AXIS_FOLLOW_RATIO: number = 0.08;
+  private readonly ICON_OVERSHOOT_DISTANCE_SCALE: number = 0.45;
   private readonly ICON_OPACITY_MAX_START_DELAY: number = 0.34;
   private readonly ICON_OPACITY_REVEAL_DURATION: number = 0.56;
   private readonly ICON_CENTER_X_RATIOS: number[] = [
@@ -251,6 +260,12 @@ struct TaskbarDownDirectionalPage {
   }
 
   private iconDirectionalCoordinate(centerXRatio: number, centerYRatio: number): number {
+    if (!this.overshootEnabled) {
+      return taskbarDownNoOvershootCoordinate(
+        this.iconArrivalProgress(centerXRatio, centerYRatio),
+        this.iconStartOffset(centerXRatio, centerYRatio)
+      );
+    }
     return unlockDirectionalPathCoordinate(
       this.iconArrivalProgress(centerXRatio, centerYRatio),
       this.iconStartOffset(centerXRatio, centerYRatio),
@@ -260,6 +275,9 @@ struct TaskbarDownDirectionalPage {
   }
 
   private iconLateralCoordinate(centerXRatio: number, centerYRatio: number): number {
+    if (!this.overshootEnabled) {
+      return 0;
+    }
     return unlockDirectionalPathLateralCoordinate(
       this.iconArrivalProgress(centerXRatio, centerYRatio),
       this.iconStartOffset(centerXRatio, centerYRatio),
@@ -271,7 +289,9 @@ struct TaskbarDownDirectionalPage {
 
   private iconTranslateX(centerXRatio: number, centerYRatio: number, motionFactor: number): number {
     if (this.closingVertically) {
-      return 0;
+      const closeProgress = 1 - this.iconTimelineProgress;
+      return (0.5 - centerXRatio) * this.fullFrameWidth() *
+        this.ICON_CLOSE_Y_AXIS_FOLLOW_RATIO * closeProgress;
     }
     const directional = this.iconDirectionalCoordinate(centerXRatio, centerYRatio);
     const lateral = this.iconLateralCoordinate(centerXRatio, centerYRatio);
@@ -329,7 +349,7 @@ struct TaskbarDownDirectionalPage {
 
   private iconScale(centerXRatio: number, centerYRatio: number): number {
     if (this.closingVertically) {
-      return 1;
+      return this.iconCloseScale;
     }
     return this.lerp(
       this.ICON_START_SCALE,
@@ -340,7 +360,7 @@ struct TaskbarDownDirectionalPage {
 
   private iconScaleX(centerXRatio: number, centerYRatio: number): number {
     if (this.closingVertically) {
-      return 1;
+      return this.iconCloseScale;
     }
     const arrivalProgress = this.iconArrivalProgress(centerXRatio, centerYRatio);
     const compression = (1 - arrivalProgress) * this.ICON_MAX_X_COMPRESSION;
@@ -430,6 +450,7 @@ struct TaskbarDownDirectionalPage {
 
   private animateOpenSequence(currentX: number, currentY: number): void {
     this.closingVertically = false;
+    this.iconCloseScale = 1;
     this.updateReleaseDirection(currentX, currentY);
     this.dragMode = this.DRAG_MODE_OPEN_FOLLOW;
     this.animating = true;
@@ -455,6 +476,30 @@ struct TaskbarDownDirectionalPage {
     });
   }
 
+  private playCloseMovement(token: number, durationMs: number): void {
+    if (token !== this.animationToken) {
+      return;
+    }
+    this.getUIContext().animateTo({
+      duration: Math.max(1, durationMs),
+      curve: curves.cubicBezierCurve(0.18, 0.88, 0.22, 1),
+      onFinish: () => {
+        if (token === this.animationToken) {
+          this.animating = false;
+          this.closingVertically = false;
+          this.iconCloseScale = 1;
+        }
+      }
+    }, () => {
+      this.progress = 0;
+      this.backgroundBlurProgress = 0;
+      this.iconTimelineProgress = 0;
+      if (this.closingVertically) {
+        this.iconCloseScale = this.ICON_CLOSE_END_SCALE;
+      }
+    });
+  }
+
   private animateClosed(): void {
     this.animationToken += 1;
     const token = this.animationToken;
@@ -463,20 +508,8 @@ struct TaskbarDownDirectionalPage {
     this.dragMode = 0;
     this.animating = true;
     this.closingVertically = this.progress >= 0.999 && this.iconTimelineProgress >= 0.999;
-    this.getUIContext().animateTo({
-      duration: this.PANEL_CLOSE_DURATION_MS,
-      curve: curves.cubicBezierCurve(0.18, 0.88, 0.22, 1),
-      onFinish: () => {
-        if (token === this.animationToken) {
-          this.animating = false;
-          this.closingVertically = false;
-        }
-      }
-    }, () => {
-      this.progress = 0;
-      this.backgroundBlurProgress = 0;
-      this.iconTimelineProgress = 0;
-    });
+    this.iconCloseScale = 1;
+    this.playCloseMovement(token, this.PANEL_CLOSE_DURATION_MS);
   }
 
   aboutToDisappear(): void {
@@ -487,6 +520,7 @@ struct TaskbarDownDirectionalPage {
   aboutToAppear(): void {
     const params = this.getUIContext().getRouter().getParams() as TaskbarDownDirectionalRouteParams;
     this.staggeredArrival = params.staggeredArrival === true;
+    this.overshootEnabled = params.overshootEnabled !== false;
   }
 
   private handleTouch(event: TouchEvent): void {
@@ -629,22 +663,22 @@ struct TaskbarDownDirectionalPage {
           [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END]
         )
 
-      Image($r('app.media.Background3'))
-        .width(this.fullFrameWidth())
-        .height(this.fullFrameHeight())
-        .objectFit(ImageFit.Fill)
+      // 在屏幕外预留模糊缓冲区，避免大半径模糊在左右视口内被截断。
+      Stack() {
+        Image($r('app.media.Background3'))
+          .width(this.fullFrameWidth())
+          .height(this.fullFrameHeight())
+          .objectFit(ImageFit.Fill)
+          .scale({
+            x: this.background3Scale() * this.backgroundBlurLayerScale(),
+            y: this.background3Scale() * this.backgroundBlurLayerScale()
+          })
+      }
+        .width(this.fullFrameWidth() + this.BACKGROUND3_BLUR_PADDING * 2)
+        .height(this.fullFrameHeight() + this.BACKGROUND3_BLUR_PADDING * 2)
+        .renderGroup(true)
         .blur(this.backgroundBlurAmount())
         .opacity(this.backgroundBlurOpacity())
-        .scale({
-          x: this.background3Scale() * this.backgroundBlurLayerScale(),
-          y: this.background3Scale() * this.backgroundBlurLayerScale()
-        })
-        .borderRadius(this.background3Radius())
-        .clip(true)
-        .expandSafeArea(
-          [SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],
-          [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END]
-        )
 
       Column()
         .width(this.fullFrameWidth())

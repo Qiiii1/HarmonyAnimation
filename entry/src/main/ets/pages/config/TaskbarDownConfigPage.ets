@@ -13,6 +13,7 @@ interface TaskbarDownPreviewRouteOptions {
 
 interface TaskbarDownDirectionalRouteParams {
   staggeredArrival: boolean;
+  overshootEnabled: boolean;
 }
 
 @Entry
@@ -150,12 +151,13 @@ struct TaskbarDownConfigPage {
     }
   }
 
-  private openDirectionalPreviewPage(staggeredArrival: boolean): void {
+  private openDirectionalPreviewPage(staggeredArrival: boolean, overshootEnabled: boolean): void {
     try {
       const options: TaskbarDownPreviewRouteOptions = {
         url: 'pages/TaskbarDownDirectionalPage',
         params: {
-          staggeredArrival: staggeredArrival
+          staggeredArrival: staggeredArrival,
+          overshootEnabled: overshootEnabled
         }
       };
       this.getUIContext().getRouter().pushUrl(options);
@@ -349,7 +351,11 @@ struct TaskbarDownConfigPage {
   }
 
   @Builder
-  private buildDirectionalPreviewButton(label: string, staggeredArrival: boolean) {
+  private buildDirectionalPreviewButton(
+    label: string,
+    staggeredArrival: boolean,
+    overshootEnabled: boolean
+  ) {
     Stack() {
       Text(label)
         .fontSize(17)
@@ -365,12 +371,12 @@ struct TaskbarDownConfigPage {
       color: '#30FFFFFF'
     })
     .onClick(() => {
-      this.openDirectionalPreviewPage(staggeredArrival);
+      this.openDirectionalPreviewPage(staggeredArrival, overshootEnabled);
     })
     .gesture(
       TapGesture({ count: 1 })
         .onAction(() => {
-          this.openDirectionalPreviewPage(staggeredArrival);
+          this.openDirectionalPreviewPage(staggeredArrival, overshootEnabled);
         })
     )
   }
@@ -414,8 +420,9 @@ struct TaskbarDownConfigPage {
             this.buildPresetDetail()
             this.buildSabParameterColumn()
             this.buildPreviewButton()
-            this.buildDirectionalPreviewButton('方向曲线 · 同步到达', false)
-            this.buildDirectionalPreviewButton('方向曲线 · 错峰到达', true)
+            this.buildDirectionalPreviewButton('方向曲线 · 同步到达', false, true)
+            this.buildDirectionalPreviewButton('方向曲线 · 错峰到达', true, true)
+            this.buildDirectionalPreviewButton('方向曲线 · 无过冲', false, false)
           }
           .width('100%')
           .padding(this.PANEL_PADDING)

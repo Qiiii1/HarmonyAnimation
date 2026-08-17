@@ -24,3 +24,14 @@ export function taskbarDownReleaseDirection(
     y: 1 / length
   };
 }
+
+export function taskbarDownNoOvershootCoordinate(
+  arrivalProgress: number,
+  startOffset: number
+): number {
+  const progress = clampTaskbarDownMotion(arrivalProgress, 0, 1);
+  if (progress >= 1) {
+    return 0;
+  }
+  return startOffset * (1 - progress);
+}
