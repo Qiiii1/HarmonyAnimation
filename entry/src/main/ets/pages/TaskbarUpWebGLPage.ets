@@ -6,11 +6,12 @@ struct TaskbarUpWebGLPage {
   @StorageLink('taskbarUpSwipeDampingRatio') upSwipeDampingRatio: number = 1.5;
   @StorageLink('taskbarUpLeadCardReleaseDurationMs') leadCardReleaseDurationMs: number = 1000;
   @StorageLink('taskbarUpCardBounceOvershootX') cardBounceOvershootX: number = 5;
+  @StorageLink('taskbarUpDismissBackTiltDeg') dismissBackTiltDeg: number = 45;
 
   private readonly controller: webview.WebviewController = new webview.WebviewController();
 
   private parameterScript(): string {
-    return `window.setTaskbarUpParams && window.setTaskbarUpParams({ durationMs: ${this.leadCardReleaseDurationMs}, dampingRatio: ${this.upSwipeDampingRatio}, reboundPercent: ${this.cardBounceOvershootX} });`;
+    return `window.setTaskbarUpParams && window.setTaskbarUpParams({ durationMs: ${this.leadCardReleaseDurationMs}, dampingRatio: ${this.upSwipeDampingRatio}, reboundPercent: ${this.cardBounceOvershootX}, dismissBackTiltDeg: ${this.dismissBackTiltDeg} });`;
   }
 
   private syncParametersToWeb(): void {

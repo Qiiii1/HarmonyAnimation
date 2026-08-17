@@ -18,20 +18,25 @@ assert.ok(
 );
 
 assert.ok(
-  configSource.includes('private openWebGLPreviewPage(): void'),
-  'TaskbarUpConfigPage should expose a WebGL preview route method'
+  configSource.includes('@StorageLink(\'taskbarUpDismissBackTiltDeg\') dismissBackTiltDeg: number = 45;') &&
+    configSource.includes('private openWebGLPreviewPage(dismissBackTiltDeg: number): void') &&
+    configSource.includes('this.dismissBackTiltDeg = dismissBackTiltDeg;'),
+  'TaskbarUpConfigPage should expose WebGL preview route buttons that select the dismiss back-tilt angle'
 );
 assert.ok(
   configSource.includes("url: 'pages/TaskbarUpWebGLPage'"),
   'TaskbarUpConfigPage should route to the WebGL preview page'
 );
 assert.ok(
-  configSource.includes('this.buildWebGLPreviewButton()'),
-  'TaskbarUpConfigPage should render the WebGL entry button'
+  configSource.includes('this.buildWebGLPreviewOptions()'),
+  'TaskbarUpConfigPage should render the WebGL tilt options'
 );
 assert.ok(
-  configSource.includes("Text('WebGL 预览')"),
-  'TaskbarUpConfigPage should label the new WebGL entry'
+  configSource.includes("Text('WebGL 后躺档位')") &&
+    configSource.includes("this.buildWebGLPreviewButton('无后躺', 0)") &&
+    configSource.includes("this.buildWebGLPreviewButton('后躺 22°', 22)") &&
+    configSource.includes("this.buildWebGLPreviewButton('后躺 45°', 45)"),
+  'TaskbarUpConfigPage should offer no-tilt, 22-degree, and 45-degree WebGL preview entries'
 );
 assert.ok(taskbarUpSource.includes('private readonly CARD_COUNT: number = 6;'), 'TaskbarUpPage should include six task cards');
 assert.ok(taskbarUpSource.includes('private readonly INITIAL_CENTER_INDEX: number = 5;'), 'TaskbarUpPage should default to the rightmost task card');
@@ -53,6 +58,11 @@ assert.ok(webglPageSource.includes("import webview from '@ohos.web.webview';"), 
 assert.ok(webglPageSource.includes('struct TaskbarUpWebGLPage'), 'WebGL page should define a routable component');
 assert.ok(webglPageSource.includes("'resource://rawfile/taskbar_up_webgl.html'"), 'WebGL page should load the local rawfile animation from the rawfile root like the reference');
 assert.ok(webglPageSource.includes('Web({'), 'WebGL page should render a Web component');
+assert.ok(
+  webglPageSource.includes('@StorageLink(\'taskbarUpDismissBackTiltDeg\') dismissBackTiltDeg: number = 45;') &&
+    webglPageSource.includes('dismissBackTiltDeg: ${this.dismissBackTiltDeg}'),
+  'WebGL page should forward the selected dismiss back-tilt angle to the rawfile animation'
+);
 assert.ok(
   webglPageSource.includes('.expandSafeArea(\n          [SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],\n          [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END]\n        )'),
   'WebGL page should expand the WebView itself through system and cutout safe areas'
@@ -257,17 +267,24 @@ assert.ok(
     !rawfileHtml.includes('const bendPower = clamp(1 - abs * 0.08, 0.72, 1);'),
   'WebGL horizontal swipe should bend nearby focus cards lightly and distant side cards much more strongly'
 );
-assert.ok(rawfileHtml.includes('uniform float uTiltY;'), 'WebGL shader should expose a Y-axis tilt uniform for the reference horizontal swipe perspective');
+assert.ok(
+  rawfileHtml.includes('uniform float uTiltY;') &&
+    rawfileHtml.includes('uniform float uTiltX;') &&
+    rawfileHtml.includes('gl.uniform1f(textureLocations.uTiltX, tiltX || 0);'),
+  'WebGL shader should expose independent Y-axis swipe tilt and X-axis dismiss back-tilt uniforms'
+);
 assert.ok(rawfileHtml.includes('uniform float uDepth;'), 'WebGL shader should expose card Z depth so horizontal swipe can move the card backward like the reference');
 assert.ok(rawfileHtml.includes('uniform float uPerspective;'), 'WebGL shader should project tilted cards with a CSS-like perspective');
 assert.ok(
   rawfileHtml.includes('float x3 = local.x * cosY;') &&
-    rawfileHtml.includes('float z3 = uDepth + local.x * sinY;'),
-  'WebGL shader should keep Y-axis card perspective without delete-time twist deformation'
+    rawfileHtml.includes('float z3 = uDepth + local.x * sinY;') &&
+    rawfileHtml.includes('float y3 = local.y * cosX - z3 * sinX;') &&
+    rawfileHtml.includes('float z4 = local.y * sinX + z3 * cosX;'),
+  'WebGL shader should combine Y-axis card perspective with X-axis backward dismiss tilt without twist deformation'
 );
-assert.ok(rawfileHtml.includes('float perspectiveScale = uPerspective / max(120.0, uPerspective - z3);'), 'WebGL shader should apply perspective scaling from card depth');
+assert.ok(rawfileHtml.includes('float perspectiveScale = uPerspective / max(120.0, uPerspective - z4);'), 'WebGL shader should apply perspective scaling from combined card depth');
 assert.ok(rawfileHtml.includes('const tiltY = (-bendDir * bendDeg) * Math.PI / 180;'), 'WebGL layout should translate the reference activeRotY into shader tilt');
-assert.ok(rawfileHtml.includes('const depth = -bendAmt * state.width * 0.16 * bendPower;'), 'WebGL layout should translate the reference bendZ into shader depth');
+assert.ok(rawfileHtml.includes('const depth = -bendAmt * state.width * 0.16 * bendPower + dismissBackDepth;'), 'WebGL layout should combine horizontal bend depth with dismiss backward depth');
 assert.ok(rawfileHtml.includes('width: 100vw;') && rawfileHtml.includes('height: 100dvh;'), 'WebGL rawfile should size the page to the full visual viewport');
 assert.ok(rawfileHtml.includes('inset: 0;') && rawfileHtml.includes('width: 100%;') && rawfileHtml.includes('height: 100%;'), 'DOM fallback desktop backgrounds should fill the viewport without overscaling the layer container');
 assert.ok(
@@ -479,6 +496,22 @@ assert.ok(
   'WebGL upward dismiss should reduce card opacity and increase blur only when the card is close to deletion'
 );
 assert.ok(
+  rawfileHtml.includes('const DISMISS_BACK_TILT_DEG = 45;') &&
+    rawfileHtml.includes('const DISMISS_BACK_DEPTH_RATIO = 0.18;') &&
+    rawfileHtml.includes('const DISMISS_BACK_TILT_FACTORS = [0.86, 0.94, 1, 0.9, 0.98, 0.92];') &&
+    rawfileHtml.includes('function dismissBackTiltFactor(index)') &&
+    rawfileHtml.includes('dismissBackTiltDeg: 45') &&
+    rawfileHtml.includes('const dismissBackTiltDeg = Number(next.dismissBackTiltDeg);') &&
+    rawfileHtml.includes('params.dismissBackTiltDeg = Math.max(0, Math.min(DISMISS_BACK_TILT_DEG, dismissBackTiltDeg));') &&
+    rawfileHtml.includes('const dismissBackProgress = soft(clamp((dismissT - 0.18) / 0.58, 0, 1));') &&
+    rawfileHtml.includes('const dismissBackTiltDeg = params.dismissBackTiltDeg;') &&
+    rawfileHtml.includes('const dismissBackRatio = dismissBackTiltDeg / DISMISS_BACK_TILT_DEG;') &&
+    rawfileHtml.includes('dismissBackTilt = dismissBackTiltDeg * dismissBackProgress * dismissBackFactor;') &&
+    rawfileHtml.includes('dismissBackDepth = -state.height * DISMISS_BACK_DEPTH_RATIO * dismissBackProgress * dismissBackFactor * dismissBackRatio;') &&
+    rawfileHtml.includes('const tiltX = dismissBackTilt * Math.PI / 180;'),
+  'WebGL upward dismiss should lay each card backward with selectable no-tilt, 22-degree, and 45-degree levels'
+);
+assert.ok(
   rawfileHtml.includes('const dismissRightShift = deleteVisualProgress;') &&
     rawfileHtml.includes('pageX = state.width * 0.12 * dismissRightShift;'),
   'WebGL upward dismiss should drift the deleted card right only when it is close to deletion'
@@ -549,8 +582,8 @@ assert.ok(
 assert.ok(rawfileHtml.includes('function drawCardLabel(card, cssScaleX, cssScaleY)'), 'WebGL rawfile should draw card labels in WebGL');
 assert.ok(rawfileHtml.includes('drawCardLabel(card, cssScaleX, cssScaleY);'), 'WebGL rawfile should draw each label on the same transformed surface as its card');
 assert.ok(
-  rawfileHtml.includes('card.rotation,\n            card.bend,\n            card.tiltY,\n            card.depth,'),
-  'WebGL card labels should use the same rotation, bend, tilt, and depth as their cards'
+  rawfileHtml.includes('card.rotation,\n            card.bend,\n            card.tiltY,\n            card.tiltX,\n            card.depth,'),
+  'WebGL card labels should use the same rotation, bend, X/Y tilt, and depth as their cards'
 );
 assert.ok(
   rawfileHtml.includes('card.width,\n            card.height,\n            localOffsetX,\n            localOffsetY'),

@@ -16,6 +16,7 @@ struct TaskbarUpConfigPage {
   @StorageLink('taskbarUpSwipeDampingRatio') upSwipeDampingRatio: number = 1.5;
   @StorageLink('taskbarUpLeadCardReleaseDurationMs') leadCardReleaseDurationMs: number = 1000;
   @StorageLink('taskbarUpCardBounceOvershootX') cardBounceOvershootX: number = 5;
+  @StorageLink('taskbarUpDismissBackTiltDeg') dismissBackTiltDeg: number = 45;
   @State selectedPresetLabel: string = '';
   @State selectedSabParameterKey: string = '';
 
@@ -145,8 +146,9 @@ struct TaskbarUpConfigPage {
     }
   }
 
-  private openWebGLPreviewPage(): void {
+  private openWebGLPreviewPage(dismissBackTiltDeg: number): void {
     try {
+      this.dismissBackTiltDeg = dismissBackTiltDeg;
       const options: TaskbarUpPreviewRouteOptions = {
         url: 'pages/TaskbarUpWebGLPage',
       };
@@ -341,30 +343,50 @@ struct TaskbarUpConfigPage {
   }
 
   @Builder
-  private buildWebGLPreviewButton() {
+  private buildWebGLPreviewButton(label: string, dismissBackTiltDeg: number) {
     Stack() {
-      Text('WebGL 预览')
-        .fontSize(17)
+      Text(label)
+        .fontSize(15)
         .fontWeight(FontWeight.Bold)
         .fontColor('#FFFFFFFF')
     }
-    .width('100%')
-    .height(54)
+    .width(0)
+    .layoutWeight(1)
+    .height(48)
     .backgroundColor('#24FFFFFF')
-    .borderRadius(20)
+    .borderRadius(18)
     .border({
       width: 1,
       color: '#30FFFFFF'
     })
     .onClick(() => {
-      this.openWebGLPreviewPage();
+      this.openWebGLPreviewPage(dismissBackTiltDeg);
     })
     .gesture(
       TapGesture({ count: 1 })
         .onAction(() => {
-          this.openWebGLPreviewPage();
+          this.openWebGLPreviewPage(dismissBackTiltDeg);
         })
     )
+  }
+
+  @Builder
+  private buildWebGLPreviewOptions() {
+    Column({ space: 10 }) {
+      Text('WebGL 后躺档位')
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#D6FFFFFF')
+        .width('100%')
+
+      Row({ space: 8 }) {
+        this.buildWebGLPreviewButton('无后躺', 0)
+        this.buildWebGLPreviewButton('后躺 22°', 22)
+        this.buildWebGLPreviewButton('后躺 45°', 45)
+      }
+      .width('100%')
+    }
+    .width('100%')
   }
 
   build() {
@@ -406,7 +428,7 @@ struct TaskbarUpConfigPage {
             this.buildPresetDetail()
             this.buildSabParameterColumn()
             this.buildPreviewButton()
-            this.buildWebGLPreviewButton()
+            this.buildWebGLPreviewOptions()
           }
           .width('100%')
           .padding(this.PANEL_PADDING)
