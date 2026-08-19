@@ -97,8 +97,8 @@ const rawTextures = JSON.parse(rawfileHtml.slice(rawTextureStart, rawTextureEnd)
 assert.equal(rawTextures.cards.length, 6, 'WebGL rawfile should inline six card textures');
 assert.equal(rawTextures.icons.length, 6, 'WebGL rawfile should inline six app icon textures');
 assert.ok(
-  rawTextures.cards.every((texture) => texture.width === 334 && texture.height === 720),
-  'WebGL card textures should all use the optimized 334x720 preview size'
+  rawTextures.cards.every((texture) => texture.width === 501 && texture.height === 1080),
+  'WebGL card textures should all use the sharper 501x1080 preview size'
 );
 assert.ok(
   rawTextures.icons.every((texture) => texture.width === 96 && texture.height === 96),
@@ -230,13 +230,17 @@ assert.ok(!rawfileHtml.includes('<img id="fallbackBackground2" src="taskbar_up_w
 assert.ok(!rawfileHtml.includes('<img id="fallbackBackground3" src="taskbar_up_webgl_background3.png"'), 'WebGL fallback background3 image should not rely on a relative rawfile URL that can hang in Harmony WebView');
 assert.ok(!rawfileHtml.includes('assets/preview/'), 'WebGL rawfile should not rely on nested preview asset paths');
 assert.ok(
-  rawfileHtml.length < 26000000,
-  'WebGL rawfile should remain bounded even with six-card inline raw RGBA textures'
+  rawfileHtml.length < 40000000,
+  'WebGL rawfile should remain bounded even with six sharper inline card textures'
 );
 assert.ok(rawfileHtml.includes('markWebGLStarted'), 'WebGL rawfile should expose a guarded ready transition');
 assert.ok(
   rawfileHtml.includes('if (!textures.background2.ready || !textures.background3.ready || !textures.background2Soft.ready || !textures.background3Soft.ready)'),
   'WebGL rawfile should not show an empty canvas before sharp and soft background textures are ready'
+);
+assert.ok(
+  rawfileHtml.includes('const dpr = Math.min(window.devicePixelRatio || 1, 3);'),
+  'WebGL canvas should allow device DPR up to 3 so card textures stay crisp on high-density screens'
 );
 assert.ok(rawfileHtml.includes('initialTextureBatchId'), 'WebGL rawfile should track initial rawfile texture loading');
 assert.ok(rawfileHtml.includes('background2: createTexture(initialAssetPaths.background2, fallbackBackground2, initialTextureBatchId)'), 'WebGL background2 texture should use the bundled raw texture during initial load');
@@ -289,8 +293,10 @@ assert.ok(rawfileHtml.includes('width: 100vw;') && rawfileHtml.includes('height:
 assert.ok(rawfileHtml.includes('inset: 0;') && rawfileHtml.includes('width: 100%;') && rawfileHtml.includes('height: 100%;'), 'DOM fallback desktop backgrounds should fill the viewport without overscaling the layer container');
 assert.ok(
   rawfileHtml.includes('background2: "resource://rawfile/taskbar_up_webgl_background5.png"') &&
-    rawfileHtml.includes('background3: "resource://rawfile/taskbar_up_webgl_background3.png"'),
-  'WebGL rawfile should use Background5 as the base background and Background3 as the foreground desktop layer'
+    rawfileHtml.includes('background3: "resource://rawfile/taskbar_up_webgl_background3.png"') &&
+    rawfileHtml.includes('background2Soft: "resource://rawfile/taskbar_up_webgl_blur_background.png"') &&
+    rawfileHtml.includes('background3Soft: "resource://rawfile/taskbar_up_webgl_blur_icon.png"'),
+  'WebGL rawfile should use Background5 as the base background, Background3 as the foreground desktop layer, and artist-provided blur layers'
 );
 assert.ok(
   rawfileHtml.indexOf('drawTaskbarBackgroundLayer(textures.background2') >= 0 &&
@@ -307,13 +313,17 @@ assert.ok(
 );
 assert.ok(
   rawfileHtml.includes('"background2Soft":') &&
-    rawfileHtml.includes('"background3Soft":'),
-  'WebGL rawfile should inline low-frequency background textures for smooth native-like blur'
+    rawfileHtml.includes('"background3Soft":') &&
+    rawfileHtml.includes('taskbar_up_webgl_blur_background.png') &&
+    rawfileHtml.includes('taskbar_up_webgl_blur_icon.png'),
+  'WebGL rawfile should inline the artist-provided blur textures for smooth native-like blur'
 );
 assert.ok(
-  rawTextures.background2Soft.width <= 48 &&
-    rawTextures.background3Soft.width <= 48,
-  'WebGL soft background textures should be lower frequency for a stronger native-like blur'
+  rawTextures.background2Soft.width === 418 &&
+    rawTextures.background2Soft.height === 906 &&
+    rawTextures.background3Soft.width === 418 &&
+    rawTextures.background3Soft.height === 906,
+  'WebGL blur background textures should use the provided blur artwork at a stable half-resolution preview size'
 );
 assert.ok(
   rawTextures.background2.width >= 800 &&
@@ -331,12 +341,12 @@ assert.equal(
   'WebGL soft foreground desktop texture should not preserve black RGB in transparent icon-layer edges'
 );
 assert.ok(
-  rawfileHtml.includes('const backgroundBlur = soft(clamp((exitBackgroundProgress - 0.04) / 0.58, 0, 1)) * 17.5 * (window.devicePixelRatio || 1);') &&
-    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background2, 1, 1 - backgroundSoftMix, backgroundBlur * 0.18);') &&
-    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background2Soft, 1, backgroundSoftMix, backgroundBlur);') &&
-    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background3, background3Scale, 1 - backgroundSoftMix, backgroundBlur * 0.18);') &&
-    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background3Soft, background3Scale, backgroundSoftMix, backgroundBlur);'),
-  'WebGL taskbar-up should combine soft background textures with additional shader blur while preserving layer order'
+  rawfileHtml.includes('const backgroundBlur = soft(clamp((exitBackgroundProgress - 0.03) / 0.56, 0, 1)) * 8.5 * (window.devicePixelRatio || 1);') &&
+    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background2, 1, 1 - backgroundSoftMix, backgroundBlur * 0.025);') &&
+    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background2Soft, 1, backgroundSoftMix, backgroundBlur * 0.18);') &&
+    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background3, background3Scale, 1 - backgroundSoftMix, backgroundBlur * 0.025);') &&
+    rawfileHtml.includes('drawTaskbarBackgroundLayer(textures.background3Soft, background3Scale, backgroundSoftMix, backgroundBlur * 0.18);'),
+  'WebGL taskbar-up should fade in the provided blur textures with only light shader blur while preserving layer order'
 );
 assert.ok(
   rawfileHtml.includes('function drawBackgroundScrim(alpha)') &&
@@ -473,13 +483,12 @@ assert.ok(
 assert.ok(
   rawfileHtml.includes('uniform float uBlurAmount;') &&
     rawfileHtml.includes('gl.uniform1f(textureLocations.uBlurAmount, blur || 0);') &&
-    rawfileHtml.includes('vec2 blurStep = min(uBlurAmount / max(uMaskSize, vec2(1.0)), vec2(0.064));') &&
-    rawfileHtml.includes('vec2 diagonalStep = blurStep * 0.72;') &&
-    rawfileHtml.includes('vec2 farStep = min(blurStep * 2.35, vec2(0.102));') &&
-    rawfileHtml.includes('vec2 farDiagonalStep = farStep * 0.72;') &&
-    rawfileHtml.includes('vec2 wideStep = min(farStep * 1.55, vec2(0.128));') &&
-    rawfileHtml.includes('vec2 wideDiagonalStep = wideStep * 0.72;'),
-  'WebGL upward dismiss and background blur should use wider, softer multi-ring samples instead of sparse cross samples'
+    rawfileHtml.includes('vec2 blurStep = min(uBlurAmount / max(uMaskSize, vec2(1.0)), vec2(0.044));') &&
+    rawfileHtml.includes('vec2 diagonalStep = blurStep * 0.62;') &&
+    rawfileHtml.includes('vec2 farStep = min(blurStep * 1.72, vec2(0.070));') &&
+    rawfileHtml.includes('vec2 farDiagonalStep = farStep * 0.58;') &&
+    !rawfileHtml.includes('vec2 wideStep ='),
+  'WebGL upward dismiss and background blur should use a compact gaussian-like kernel instead of sparse ghosting samples'
 );
 assert.ok(
   rawfileHtml.includes('float roundedMask(vec2 uv, vec2 size, float radius, float softness)') &&
@@ -490,7 +499,7 @@ assert.ok(
 );
 assert.ok(
   rawfileHtml.includes('const deleteVisualProgress = soft(clamp((dismissT - 0.58) / 0.36, 0, 1));') &&
-    rawfileHtml.includes('dismissBlur = deleteVisualProgress * 19 * (window.devicePixelRatio || 1);') &&
+    rawfileHtml.includes('dismissBlur = deleteVisualProgress * 15.5 * (window.devicePixelRatio || 1);') &&
     rawfileHtml.includes('dismissFade = 1 - deleteVisualProgress * 0.62;') &&
     rawfileHtml.includes('alpha *= dismissFade;'),
   'WebGL upward dismiss should reduce card opacity and increase blur only when the card is close to deletion'
@@ -576,6 +585,13 @@ assert.ok(
   'WebGL rawfile should compose icon and tag text into a transparent WebGL label texture'
 );
 assert.ok(
+  rawfileHtml.includes('function uploadCanvasTexture(entry, canvas, logicalWidth, logicalHeight)') &&
+    rawfileHtml.includes('entry.displayWidth = logicalWidth || canvas.width / 2;') &&
+    rawfileHtml.includes('entry.displayHeight = logicalHeight || canvas.height / 2;') &&
+    rawfileHtml.includes('uploadCanvasTexture(entry, labelCanvas, displayWidth, displayHeight);'),
+  'WebGL card label texture should use DPR for sharpness without feeding physical canvas pixels into layout'
+);
+assert.ok(
   rawfileHtml.includes('labels: cardMetadata.map((meta, index) => createCardLabelTexture(meta, labelIconAssetPaths[index]))'),
   'WebGL rawfile should create one label texture per card from the card metadata and icon assets'
 );
@@ -620,6 +636,8 @@ assert.ok(rawfileHtml.includes('state.height * 0.68'), 'WebGL recents cards shou
 const rootPreviewAssets = [
   ['Background5.png', 'taskbar_up_webgl_background5.png'],
   ['Background3.png', 'taskbar_up_webgl_background3.png'],
+  ['BlurBackground.png', 'taskbar_up_webgl_blur_background.png'],
+  ['BlurIcon.png', 'taskbar_up_webgl_blur_icon.png'],
   ['Card1.png', 'taskbar_up_webgl_card1.png'],
   ['Card2.png', 'taskbar_up_webgl_card2.png'],
   ['Card3.png', 'taskbar_up_webgl_card3.png'],

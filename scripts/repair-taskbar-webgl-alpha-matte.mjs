@@ -39,7 +39,7 @@ function bleedTransparentRgb(bytes, width, height) {
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
     const offset = getPixelOffset(pixelIndex);
-    if (bytes[offset + 3] > 24) {
+    if (bytes[offset + 3] > 32) {
       filled[pixelIndex] = 1;
       queue[tail] = pixelIndex;
       tail += 1;
@@ -77,6 +77,15 @@ function bleedTransparentRgb(bytes, width, height) {
       filled[neighbor] = 1;
       queue[tail] = neighbor;
       tail += 1;
+    }
+  }
+
+  for (let offset = 0; offset < bytes.length; offset += 4) {
+    const alpha = bytes[offset + 3];
+    if (alpha > 0 && alpha <= 32 && bytes[offset] < 8 && bytes[offset + 1] < 8 && bytes[offset + 2] < 8) {
+      bytes[offset] = 32;
+      bytes[offset + 1] = 32;
+      bytes[offset + 2] = 32;
     }
   }
 }
