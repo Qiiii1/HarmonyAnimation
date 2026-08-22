@@ -14,6 +14,7 @@ interface TaskbarDownPreviewRouteOptions {
 interface TaskbarDownDirectionalRouteParams {
   staggeredArrival: boolean;
   overshootEnabled: boolean;
+  staggerLeadRatio: number;
 }
 
 @Entry
@@ -116,6 +117,11 @@ struct TaskbarDownConfigPage {
     return `时长 ${this.moduleEnterTotalDurationMs}ms / 阻尼 ${this.openDragDampingRatio} / 回弹 ${this.moduleReboundPercent}%`;
   }
 
+  private staggerPreviewLabel(name: string, staggerLeadRatio: number): string {
+    const gapMs = Math.round(this.moduleEnterTotalDurationMs * staggerLeadRatio);
+    return `${name} · 首尾差 ${gapMs}ms`;
+  }
+
   private sabParameterSummary(parameter: SabParameterItem): string {
     return formatSabParameterText(parameter);
   }
@@ -151,13 +157,18 @@ struct TaskbarDownConfigPage {
     }
   }
 
-  private openDirectionalPreviewPage(staggeredArrival: boolean, overshootEnabled: boolean): void {
+  private openDirectionalPreviewPage(
+    staggeredArrival: boolean,
+    overshootEnabled: boolean,
+    staggerLeadRatio: number
+  ): void {
     try {
       const options: TaskbarDownPreviewRouteOptions = {
         url: 'pages/TaskbarDownDirectionalPage',
         params: {
           staggeredArrival: staggeredArrival,
-          overshootEnabled: overshootEnabled
+          overshootEnabled: overshootEnabled,
+          staggerLeadRatio: staggerLeadRatio
         }
       };
       this.getUIContext().getRouter().pushUrl(options);
@@ -354,7 +365,8 @@ struct TaskbarDownConfigPage {
   private buildDirectionalPreviewButton(
     label: string,
     staggeredArrival: boolean,
-    overshootEnabled: boolean
+    overshootEnabled: boolean,
+    staggerLeadRatio: number
   ) {
     Stack() {
       Text(label)
@@ -371,12 +383,12 @@ struct TaskbarDownConfigPage {
       color: '#30FFFFFF'
     })
     .onClick(() => {
-      this.openDirectionalPreviewPage(staggeredArrival, overshootEnabled);
+      this.openDirectionalPreviewPage(staggeredArrival, overshootEnabled, staggerLeadRatio);
     })
     .gesture(
       TapGesture({ count: 1 })
         .onAction(() => {
-          this.openDirectionalPreviewPage(staggeredArrival, overshootEnabled);
+          this.openDirectionalPreviewPage(staggeredArrival, overshootEnabled, staggerLeadRatio);
         })
     )
   }
@@ -420,9 +432,10 @@ struct TaskbarDownConfigPage {
             this.buildPresetDetail()
             this.buildSabParameterColumn()
             this.buildPreviewButton()
-            this.buildDirectionalPreviewButton('方向曲线 · 同步到达', false, true)
-            this.buildDirectionalPreviewButton('方向曲线 · 错峰到达', true, true)
-            this.buildDirectionalPreviewButton('方向曲线 · 无过冲', false, false)
+            this.buildDirectionalPreviewButton(this.staggerPreviewLabel('错峰配比 1', 0.65), true, true, 0.65)
+            this.buildDirectionalPreviewButton(this.staggerPreviewLabel('错峰配比 2', 0.78), true, true, 0.78)
+            this.buildDirectionalPreviewButton(this.staggerPreviewLabel('错峰配比 3', 0.88), true, true, 0.88)
+            this.buildDirectionalPreviewButton(this.staggerPreviewLabel('方向曲线 · 无过冲', 0.78), true, false, 0.78)
           }
           .width('100%')
           .padding(this.PANEL_PADDING)

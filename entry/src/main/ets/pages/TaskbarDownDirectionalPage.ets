@@ -4,7 +4,6 @@ import {
   unlockDirectionalPathCoordinate,
   unlockDirectionalPathLateralCoordinate,
   unlockDirectionalOvershootDistance,
-  unlockModuleArrivalEndProgress,
   unlockModuleArrivalOvershootScale,
   unlockModuleArrivalProgress,
   unlockModuleArrivalStartScale,
@@ -12,13 +11,19 @@ import {
   unlockModuleDistanceFalloff
 } from './UnlockDesktopDirectionalMotion';
 import {
+  taskbarDownHorizontalArrivalEndProgress,
+  taskbarDownHorizontalDistanceRank,
   taskbarDownNoOvershootCoordinate,
-  taskbarDownReleaseDirection
+  taskbarDownOpacityColumnIndex,
+  taskbarDownOpacityColumnOrder,
+  taskbarDownReleaseDirection,
+  taskbarDownStaggeredArrivalProgress
 } from './TaskbarDownDirectionalMotion';
 
 interface TaskbarDownDirectionalRouteParams {
   staggeredArrival: boolean;
   overshootEnabled: boolean;
+  staggerLeadRatio: number;
 }
 
 @Entry
@@ -35,6 +40,7 @@ struct TaskbarDownDirectionalPage {
   @State iconCloseScale: number = 1;
   @State staggeredArrival: boolean = false;
   @State overshootEnabled: boolean = true;
+  @State staggerLeadRatio: number = 0.42;
   @StorageLink('taskbarDownOpenDragDampingRatio') openDragDampingRatio: number = 1.5;
   @StorageLink('taskbarDownModuleEnterDurationMs') moduleEnterTotalDurationMs: number = 750;
   @StorageLink('taskbarDownModuleReboundPercent') moduleReboundPercent: number = 2;
@@ -86,8 +92,11 @@ struct TaskbarDownDirectionalPage {
   private readonly ICON_START_OFFSET: number = -110;
   private readonly ICON_TURN_PROGRESS: number = 0.4980680286858419;
   private readonly ICON_TURN_LATERAL_OFFSET: number = 8;
-  private readonly ICON_EARLIEST_ARRIVAL_PROGRESS: number = 0.66;
   private readonly ICON_MAX_OVERSHOOT_SCALE: number = 1.35;
+  private readonly ICON_NEAR_START_DISTANCE_SCALE: number = 0.72;
+  private readonly ICON_FAR_START_DISTANCE_SCALE: number = 1.24;
+  private readonly ICON_NEAR_OVERSHOOT_SCALE: number = 0.55;
+  private readonly ICON_FAR_OVERSHOOT_SCALE: number = 1.35;
   private readonly ICON_MIN_DISTANCE_RESPONSE: number = 0.68;
   private readonly ICON_BOTTOM_TRAVEL_BOOST: number = 0.18;
   private readonly ICON_CLOSE_OFFSET_Y: number = -360;
@@ -97,6 +106,8 @@ struct TaskbarDownDirectionalPage {
   private readonly ICON_OVERSHOOT_DISTANCE_SCALE: number = 0.45;
   private readonly ICON_OPACITY_MAX_START_DELAY: number = 0.34;
   private readonly ICON_OPACITY_REVEAL_DURATION: number = 0.56;
+  private readonly STAGGERED_ICON_OPACITY_COLUMN_START_GAP: number = 0.04;
+  private readonly STAGGERED_ICON_OPACITY_REVEAL_DURATION: number = 0.26;
   private readonly ICON_CENTER_X_RATIOS: number[] = [
     0.8511, 0.1482, 0.7112, 0.2884, 0.7112, 0.2872, 0.7119,
     0.6056, 0.3936, 0.1809, 0.8184, 0.6056, 0.3936, 0.1809
@@ -206,22 +217,43 @@ struct TaskbarDownDirectionalPage {
     if (!this.staggeredArrival) {
       return 1;
     }
-    return unlockModuleArrivalEndProgress(
-      this.iconDirectionProjection(centerXRatio, centerYRatio),
-      this.iconArrivalMinimumProjection,
-      this.iconArrivalMaximumProjection,
-      this.ICON_EARLIEST_ARRIVAL_PROGRESS
+    return taskbarDownHorizontalArrivalEndProgress(
+      this.dragStartX,
+      this.fullFrameWidth() * centerXRatio,
+      this.fullFrameWidth(),
+      1 - this.staggerLeadRatio
     );
   }
 
   private iconArrivalProgress(centerXRatio: number, centerYRatio: number): number {
+    if (this.staggeredArrival) {
+      return taskbarDownStaggeredArrivalProgress(
+        this.iconTimelineProgress,
+        this.iconArrivalEndProgress(centerXRatio, centerYRatio)
+      );
+    }
     return unlockModuleArrivalProgress(
       this.iconTimelineProgress,
       this.iconArrivalEndProgress(centerXRatio, centerYRatio)
     );
   }
 
+  private iconHorizontalDistanceRank(centerXRatio: number): number {
+    return taskbarDownHorizontalDistanceRank(
+      this.dragStartX,
+      this.fullFrameWidth() * centerXRatio,
+      this.fullFrameWidth()
+    );
+  }
+
   private iconOvershootScale(centerXRatio: number, centerYRatio: number): number {
+    if (this.staggeredArrival) {
+      return this.lerp(
+        this.ICON_NEAR_OVERSHOOT_SCALE,
+        this.ICON_FAR_OVERSHOOT_SCALE,
+        this.iconHorizontalDistanceRank(centerXRatio)
+      );
+    }
     return unlockModuleArrivalOvershootScale(
       this.iconArrivalEndProgress(centerXRatio, centerYRatio),
       this.ICON_MAX_OVERSHOOT_SCALE
@@ -229,6 +261,14 @@ struct TaskbarDownDirectionalPage {
   }
 
   private iconStartOffset(centerXRatio: number, centerYRatio: number): number {
+    if (this.staggeredArrival) {
+      const distanceScale = this.lerp(
+        this.ICON_NEAR_START_DISTANCE_SCALE,
+        this.ICON_FAR_START_DISTANCE_SCALE,
+        this.iconHorizontalDistanceRank(centerXRatio)
+      );
+      return this.ICON_START_OFFSET * distanceScale;
+    }
     return this.ICON_START_OFFSET * unlockModuleArrivalStartScale(
       this.iconArrivalEndProgress(centerXRatio, centerYRatio)
     );
@@ -244,6 +284,10 @@ struct TaskbarDownDirectionalPage {
   }
 
   private iconDistanceResponse(centerXRatio: number, centerYRatio: number): number {
+    const bottomProgress = this.clamp((centerYRatio - 0.45) / 0.20, 0, 1);
+    if (this.staggeredArrival) {
+      return 1 + bottomProgress * this.ICON_BOTTOM_TRAVEL_BOOST;
+    }
     const rawResponse = unlockModuleDistanceFalloff(
       this.dragStartX,
       this.dragStartY,
@@ -255,7 +299,6 @@ struct TaskbarDownDirectionalPage {
       this.fullFrameHeight()
     );
     const distanceResponse = this.lerp(this.ICON_MIN_DISTANCE_RESPONSE, 1, rawResponse);
-    const bottomProgress = this.clamp((centerYRatio - 0.45) / 0.20, 0, 1);
     return distanceResponse * (1 + bottomProgress * this.ICON_BOTTOM_TRAVEL_BOOST);
   }
 
@@ -293,6 +336,9 @@ struct TaskbarDownDirectionalPage {
       return (0.5 - centerXRatio) * this.fullFrameWidth() *
         this.ICON_CLOSE_Y_AXIS_FOLLOW_RATIO * closeProgress;
     }
+    if (this.staggeredArrival) {
+      return 0;
+    }
     const directional = this.iconDirectionalCoordinate(centerXRatio, centerYRatio);
     const lateral = this.iconLateralCoordinate(centerXRatio, centerYRatio);
     const response = this.iconDistanceResponse(centerXRatio, centerYRatio) * motionFactor;
@@ -317,6 +363,14 @@ struct TaskbarDownDirectionalPage {
     return 1 - Math.pow(1 - t, 2.3);
   }
 
+  private staggeredModuleOpacity(progress: number): number {
+    if (progress >= 0.999) {
+      return 1;
+    }
+    const t = this.clamp(progress, 0, 1);
+    return 1 - Math.pow(1 - t, 3.4);
+  }
+
   private iconOpacityLayerRank(centerXRatio: number, centerYRatio: number): number {
     const projectionRange = this.iconArrivalMaximumProjection - this.iconArrivalMinimumProjection;
     if (projectionRange <= 0.001) {
@@ -331,8 +385,22 @@ struct TaskbarDownDirectionalPage {
   }
 
   private iconLayerOpacityProgress(centerXRatio: number, centerYRatio: number): number {
-    const startProgress = this.iconOpacityLayerRank(centerXRatio, centerYRatio) *
-      this.ICON_OPACITY_MAX_START_DELAY;
+    if (this.staggeredArrival) {
+      const columnIndex = taskbarDownOpacityColumnIndex(centerXRatio);
+      const columnOrder = taskbarDownOpacityColumnOrder(
+        this.dragStartX,
+        this.fullFrameWidth(),
+        columnIndex
+      );
+      const startProgress = columnOrder * this.STAGGERED_ICON_OPACITY_COLUMN_START_GAP;
+      return this.clamp(
+        (this.iconTimelineProgress - startProgress) / this.STAGGERED_ICON_OPACITY_REVEAL_DURATION,
+        0,
+        1
+      );
+    }
+    const layerRank = this.iconOpacityLayerRank(centerXRatio, centerYRatio);
+    const startProgress = layerRank * this.ICON_OPACITY_MAX_START_DELAY;
     return this.clamp(
       (this.iconTimelineProgress - startProgress) / this.ICON_OPACITY_REVEAL_DURATION,
       0,
@@ -344,6 +412,9 @@ struct TaskbarDownDirectionalPage {
     const opacityProgress = this.closingVertically
       ? this.iconTimelineProgress
       : this.iconLayerOpacityProgress(centerXRatio, centerYRatio);
+    if (this.staggeredArrival && !this.closingVertically) {
+      return this.staggeredModuleOpacity(opacityProgress);
+    }
     return this.baseModuleOpacity(opacityProgress);
   }
 
@@ -370,6 +441,14 @@ struct TaskbarDownDirectionalPage {
   private updateReleaseDirection(currentX: number, currentY: number): void {
     this.dragDeltaX = currentX - this.dragStartX;
     this.dragDeltaY = currentY - this.dragStartY;
+    if (this.staggeredArrival) {
+      this.releaseDirectionX = 0;
+      this.releaseDirectionY = 1;
+      this.releaseTouchX = this.clamp(currentX, 0, this.fullFrameWidth());
+      this.releaseTouchY = this.clamp(currentY, 0, this.fullFrameHeight());
+      this.updateIconArrivalProjectionRange();
+      return;
+    }
     const direction = taskbarDownReleaseDirection(
       this.dragDeltaX,
       this.dragDeltaY,
@@ -521,6 +600,7 @@ struct TaskbarDownDirectionalPage {
     const params = this.getUIContext().getRouter().getParams() as TaskbarDownDirectionalRouteParams;
     this.staggeredArrival = params.staggeredArrival === true;
     this.overshootEnabled = params.overshootEnabled !== false;
+    this.staggerLeadRatio = this.clamp(params.staggerLeadRatio, 0, 0.92);
   }
 
   private handleTouch(event: TouchEvent): void {
