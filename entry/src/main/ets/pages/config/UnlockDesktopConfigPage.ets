@@ -36,6 +36,8 @@ struct UnlockDesktopConfigPage {
   private readonly PRESET_GAP: number = 6;
   private readonly PRESET_HEIGHT: number = 34;
   private readonly PRESET_BUTTON_WIDTH: number = 42;
+  private readonly INNOVATION_DURATION_MS: number = 630;
+  private readonly INNOVATION_DAMPING_RATIO: number = 0.6;
   private readonly reboundLevels: UnlockDesktopReboundLevel[] = [
     { label: '小', value: 3 },
     { label: '中', value: 6 },
@@ -145,9 +147,17 @@ struct UnlockDesktopConfigPage {
     this.unlockIconReboundPercent = parameter.reboundPercent;
   }
 
-  private applyReboundLevel(level: UnlockDesktopReboundLevel): void {
+  private isInnovationLevelSelected(level: UnlockDesktopReboundLevel): boolean {
+    return this.isSelected(this.unlockToHomeDurationMs, this.INNOVATION_DURATION_MS)
+      && this.isSelected(this.unlockDragFollowFactor, this.INNOVATION_DAMPING_RATIO)
+      && this.isSelected(this.unlockIconReboundPercent, level.value);
+  }
+
+  private applyInnovationSceneLevel(level: UnlockDesktopReboundLevel): void {
     this.selectedPresetLabel = '';
     this.selectedSabParameterKey = '';
+    this.unlockToHomeDurationMs = this.INNOVATION_DURATION_MS;
+    this.unlockDragFollowFactor = this.INNOVATION_DAMPING_RATIO;
     this.unlockIconReboundPercent = level.value;
   }
 
@@ -193,7 +203,7 @@ struct UnlockDesktopConfigPage {
         .fontWeight(FontWeight.Bold)
         .fontColor('#FFFFFF')
 
-      Text('可单独选择小、中、大三档回弹，也可点击实验档位同时应用时长、阻尼和回弹。')
+      Text('创新场景档位固定使用 630ms 和阻尼比 0.6，仅对比小、中、大三档回弹差异。')
         .fontSize(14)
         .lineHeight(22)
         .fontColor('#D6FFFFFF')
@@ -241,41 +251,41 @@ struct UnlockDesktopConfigPage {
   }
 
   @Builder
-  private buildReboundLevelButton(level: UnlockDesktopReboundLevel) {
+  private buildInnovationSceneLevelButton(level: UnlockDesktopReboundLevel) {
     Column({ space: 2 }) {
       Text(level.label)
         .fontSize(15)
         .fontWeight(FontWeight.Bold)
-        .fontColor(this.isSelected(this.unlockIconReboundPercent, level.value) ? '#101820' : '#FFFFFFFF')
+        .fontColor(this.isInnovationLevelSelected(level) ? '#101820' : '#FFFFFFFF')
 
       Text(`${level.value}%`)
         .fontSize(11)
-        .fontColor(this.isSelected(this.unlockIconReboundPercent, level.value) ? '#99101820' : '#BFFFFFFF')
+        .fontColor(this.isInnovationLevelSelected(level) ? '#99101820' : '#BFFFFFFF')
     }
     .layoutWeight(1)
     .height(48)
     .padding({ top: 6, bottom: 6 })
-    .backgroundColor(this.isSelected(this.unlockIconReboundPercent, level.value) ? '#F2FFFFFF' : '#18FFFFFF')
+    .backgroundColor(this.isInnovationLevelSelected(level) ? '#F2FFFFFF' : '#18FFFFFF')
     .borderRadius(16)
     .border({
       width: 1,
-      color: this.isSelected(this.unlockIconReboundPercent, level.value) ? '#CCFFFFFF' : '#22FFFFFF'
+      color: this.isInnovationLevelSelected(level) ? '#CCFFFFFF' : '#22FFFFFF'
     })
     .onClick(() => {
-      this.applyReboundLevel(level);
+      this.applyInnovationSceneLevel(level);
     })
   }
 
   @Builder
-  private buildReboundLevelSelector() {
+  private buildInnovationSceneLevelSelector() {
     Column({ space: 10 }) {
       Row() {
-        Text('回弹档位')
+        Text('创新场景档位')
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor('#FFFFFFFF')
 
-        Text('默认：中档')
+        Text('630ms · 阻尼 0.6')
           .fontSize(12)
           .fontColor('#CCFFFFFF')
       }
@@ -284,7 +294,7 @@ struct UnlockDesktopConfigPage {
 
       Row({ space: 8 }) {
         ForEach(this.reboundLevels, (level: UnlockDesktopReboundLevel) => {
-          this.buildReboundLevelButton(level)
+          this.buildInnovationSceneLevelButton(level)
         }, (level: UnlockDesktopReboundLevel) => level.label)
       }
       .width('100%')
@@ -479,7 +489,7 @@ struct UnlockDesktopConfigPage {
         Scroll() {
           Column({ space: 24 }) {
             this.buildHeader()
-            this.buildReboundLevelSelector()
+            this.buildInnovationSceneLevelSelector()
             this.buildPresetList()
             this.buildPresetDetail()
             this.buildSabParameterColumn()

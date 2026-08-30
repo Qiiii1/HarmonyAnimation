@@ -239,7 +239,6 @@ export const TASKBAR_DOWN_SAB_PARAMETERS: SabParameterItem[] = [
 ];
 
 export const UNLOCK_DESKTOP_SAB_PARAMETERS: SabParameterItem[] = [
-  { mark: '创新S标', name: '创新参数', duration: '630ms', rebound: '3%', damping: '0.6', durationMs: 630, reboundPercent: 3, dampingRatio: 0.6 },
   { mark: 'S标', name: '基准参数', duration: '300ms', rebound: '13.42%', damping: '0.3', durationMs: 300, reboundPercent: 13.42, dampingRatio: 0.3 },
   { mark: 'A标', name: '参数1', duration: '630ms', rebound: '4.5%', damping: '0.6', durationMs: 630, reboundPercent: 4.5, dampingRatio: 0.6 },
   { mark: 'A标', name: '参数2', duration: '750ms', rebound: '6.5%', damping: '0.9', durationMs: 750, reboundPercent: 6.5, dampingRatio: 0.9 },

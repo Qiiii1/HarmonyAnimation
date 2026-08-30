@@ -395,14 +395,12 @@ assert.ok(configSource.includes("this.buildDirectionalPreviewButton('方向响�
 assert.ok(configSource.includes("{ label: '小', value: 3 }"));
 assert.ok(configSource.includes("{ label: '中', value: 6 }"));
 assert.ok(configSource.includes("{ label: '大', value: 10 }"));
-assert.ok(configSource.includes('this.buildReboundLevelSelector()'));
+assert.ok(configSource.includes("Text('创新场景档位')"));
+assert.ok(configSource.includes("Text('630ms · 阻尼 0.6')"));
+assert.ok(configSource.includes('this.buildInnovationSceneLevelSelector()'));
+assert.ok(configSource.includes('this.unlockToHomeDurationMs = this.INNOVATION_DURATION_MS;'));
+assert.ok(configSource.includes('this.unlockDragFollowFactor = this.INNOVATION_DAMPING_RATIO;'));
 assert.ok(configSource.includes('this.unlockIconReboundPercent = level.value;'));
-const presetSource = fs.readFileSync(path.resolve(
-  'entry/src/main/ets/pages/config/ExperimentPresetData.ets'
-), 'utf8');
-assert.ok(presetSource.includes(
-  "{ mark: '创新S标', name: '创新参数', duration: '630ms', rebound: '3%', damping: '0.6', durationMs: 630, reboundPercent: 3, dampingRatio: 0.6 }"
-));
-
+assert.ok(configSource.includes('private isInnovationLevelSelected(level: UnlockDesktopReboundLevel): boolean'));
 const routes = JSON.parse(fs.readFileSync(routesPath, 'utf8'));
 assert.ok(routes.src.includes('pages/UnlockDesktopDirectionalPage'));
