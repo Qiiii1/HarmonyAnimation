@@ -41,7 +41,7 @@ struct UnlockDesktopPage {
   @StorageLink('unlockToHomeDurationMs') unlockToHomeDurationMs: number = 750;
   // 解锁进入第一屏后图标回弹幅度，单位百分比。
   // 例如 6 表示图标会先放大到 106% 再回到 100%。
-  @StorageLink('unlockIconReboundPercent') unlockIconReboundPercent: number = 15;
+  @StorageLink('unlockIconReboundPercent') unlockIconReboundPercent: number = 6;
 
   private dragStartY: number = 0;
   private dragStartX: number = 0;

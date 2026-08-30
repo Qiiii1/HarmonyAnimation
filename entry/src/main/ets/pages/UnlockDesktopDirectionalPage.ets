@@ -29,7 +29,7 @@ struct UnlockDesktopDirectionalPage {
   @State unlockDirectionalStaggeredArrival: boolean = false;
   @StorageLink('unlockDragFollowFactor') unlockDragFollowFactor: number = 1.5;
   @StorageLink('unlockToHomeDurationMs') unlockToHomeDurationMs: number = 750;
-  @StorageLink('unlockIconReboundPercent') unlockIconReboundPercent: number = 15;
+  @StorageLink('unlockIconReboundPercent') unlockIconReboundPercent: number = 6;
 
   private dragStartX: number = 0;
   private dragStartY: number = 0;
@@ -56,6 +56,8 @@ struct UnlockDesktopDirectionalPage {
   private readonly MODULE_START_OFFSET: number = -520;
   private readonly MODULE_TURN_PROGRESS: number = 0.4980680286858419;
   private readonly MODULE_TURN_LATERAL_OFFSET: number = 12;
+  private readonly MODULE_OVERSHOOT_BASE_DISTANCE: number = 16;
+  private readonly MODULE_OVERSHOOT_DISTANCE_PER_PERCENT: number = 1.6;
   private readonly MODULE_EARLIEST_ARRIVAL_PROGRESS: number = 0.5;
   private readonly MODULE_STAGGERED_MAX_OVERSHOOT_SCALE: number = 1.5;
   private readonly MODULE_CENTER_X_RATIOS: number[] = [
@@ -197,7 +199,11 @@ struct UnlockDesktopDirectionalPage {
   }
 
   private moduleOvershootDistanceFor(centerXRatio: number, centerYRatio: number): number {
-    return unlockDirectionalOvershootDistance(this.unlockIconReboundPercent) *
+    return unlockDirectionalOvershootDistance(
+      this.unlockIconReboundPercent,
+      this.MODULE_OVERSHOOT_BASE_DISTANCE,
+      this.MODULE_OVERSHOOT_DISTANCE_PER_PERCENT
+    ) *
       this.moduleArrivalOvershootScale(centerXRatio, centerYRatio);
   }
 

@@ -77,6 +77,9 @@ assert.equal(unlockDirectionalOvershootDistance(0), 48);
 assert.equal(unlockDirectionalOvershootDistance(15), 60);
 assert.equal(unlockDirectionalOvershootDistance(40), 80);
 assert.equal(unlockDirectionalOvershootDistance(80), 80);
+assertAlmostEqual(unlockDirectionalOvershootDistance(3, 16, 1.6), 20.8);
+assertAlmostEqual(unlockDirectionalOvershootDistance(6, 16, 1.6), 25.6);
+assert.equal(unlockDirectionalOvershootDistance(10, 16, 1.6), 32);
 
 assert.equal(unlockEaseOutProgress(0), 0);
 assert.equal(unlockEaseOutProgress(1), 1);
@@ -345,6 +348,8 @@ assert.ok(pageSource.includes('MODULE_START_SCALE: number = 0.88'));
 assert.ok(pageSource.includes('MODULE_START_OFFSET: number = -520'));
 assert.ok(pageSource.includes('MODULE_TURN_PROGRESS: number = 0.4980680286858419'));
 assert.ok(pageSource.includes('MODULE_TURN_LATERAL_OFFSET: number = 12'));
+assert.ok(pageSource.includes('MODULE_OVERSHOOT_BASE_DISTANCE: number = 16'));
+assert.ok(pageSource.includes('MODULE_OVERSHOOT_DISTANCE_PER_PERCENT: number = 1.6'));
 assert.ok(pageSource.includes('MODULE_EARLIEST_ARRIVAL_PROGRESS: number = 0.5'));
 assert.ok(pageSource.includes('MODULE_STAGGERED_MAX_OVERSHOOT_SCALE: number = 1.5'));
 assert.ok(pageSource.includes('unlockModuleArrivalOvershootScale('));
@@ -387,6 +392,17 @@ assert.ok(configSource.includes('private openDirectionalPreviewPage(staggeredArr
 assert.ok(configSource.includes('staggeredArrival: staggeredArrival'));
 assert.ok(configSource.includes("this.buildDirectionalPreviewButton('方向响应 · 同时到达', false)"));
 assert.ok(configSource.includes("this.buildDirectionalPreviewButton('方向响应 · 错峰到达', true)"));
+assert.ok(configSource.includes("{ label: '小', value: 3 }"));
+assert.ok(configSource.includes("{ label: '中', value: 6 }"));
+assert.ok(configSource.includes("{ label: '大', value: 10 }"));
+assert.ok(configSource.includes('this.buildReboundLevelSelector()'));
+assert.ok(configSource.includes('this.unlockIconReboundPercent = level.value;'));
+const presetSource = fs.readFileSync(path.resolve(
+  'entry/src/main/ets/pages/config/ExperimentPresetData.ets'
+), 'utf8');
+assert.ok(presetSource.includes(
+  "{ mark: '创新S标', name: '创新参数', duration: '630ms', rebound: '3%', damping: '0.6', durationMs: 630, reboundPercent: 3, dampingRatio: 0.6 }"
+));
 
 const routes = JSON.parse(fs.readFileSync(routesPath, 'utf8'));
 assert.ok(routes.src.includes('pages/UnlockDesktopDirectionalPage'));

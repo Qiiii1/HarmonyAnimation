@@ -25,8 +25,13 @@ export function unlockReleaseDirection(
   };
 }
 
-export function unlockDirectionalOvershootDistance(reboundPercent: number): number {
-  return 48 + clampUnlockMotion(reboundPercent, 0, 40) * 0.8;
+export function unlockDirectionalOvershootDistance(
+  reboundPercent: number,
+  baseDistance: number = 48,
+  distancePerPercent: number = 0.8
+): number {
+  return Math.max(0, baseDistance) +
+    clampUnlockMotion(reboundPercent, 0, 40) * Math.max(0, distancePerPercent);
 }
 
 export function unlockEaseOutProgress(progress: number): number {

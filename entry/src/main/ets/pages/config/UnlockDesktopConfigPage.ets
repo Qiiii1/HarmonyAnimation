@@ -15,12 +15,17 @@ interface UnlockDesktopDirectionalRouteParams {
   staggeredArrival: boolean;
 }
 
+interface UnlockDesktopReboundLevel {
+  label: string;
+  value: number;
+}
+
 @Entry
 @Component
 struct UnlockDesktopConfigPage {
   @StorageLink('unlockDragFollowFactor') unlockDragFollowFactor: number = 1.5;
   @StorageLink('unlockToHomeDurationMs') unlockToHomeDurationMs: number = 750;
-  @StorageLink('unlockIconReboundPercent') unlockIconReboundPercent: number = 15;
+  @StorageLink('unlockIconReboundPercent') unlockIconReboundPercent: number = 6;
   @State selectedPresetLabel: string = '';
   @State selectedSabParameterKey: string = '';
 
@@ -31,6 +36,11 @@ struct UnlockDesktopConfigPage {
   private readonly PRESET_GAP: number = 6;
   private readonly PRESET_HEIGHT: number = 34;
   private readonly PRESET_BUTTON_WIDTH: number = 42;
+  private readonly reboundLevels: UnlockDesktopReboundLevel[] = [
+    { label: '小', value: 3 },
+    { label: '中', value: 6 },
+    { label: '大', value: 10 }
+  ];
   private readonly presets: UnlockDesktopPresetItem[] = UNLOCK_DESKTOP_PRESETS;
   private readonly sabParameters: SabParameterItem[] = UNLOCK_DESKTOP_SAB_PARAMETERS;
 
@@ -135,6 +145,12 @@ struct UnlockDesktopConfigPage {
     this.unlockIconReboundPercent = parameter.reboundPercent;
   }
 
+  private applyReboundLevel(level: UnlockDesktopReboundLevel): void {
+    this.selectedPresetLabel = '';
+    this.selectedSabParameterKey = '';
+    this.unlockIconReboundPercent = level.value;
+  }
+
   aboutToAppear(): void {
     this.selectedPresetLabel = this.currentPresetLabel();
     this.selectedSabParameterKey = this.selectedPresetLabel.length > 0 ? '' : this.currentSabParameterKey();
@@ -177,7 +193,7 @@ struct UnlockDesktopConfigPage {
         .fontWeight(FontWeight.Bold)
         .fontColor('#FFFFFF')
 
-      Text('点击实验档位后，会同时应用解锁动效时长、上划阻尼和桌面模块回弹。')
+      Text('可单独选择小、中、大三档回弹，也可点击实验档位同时应用时长、阻尼和回弹。')
         .fontSize(14)
         .lineHeight(22)
         .fontColor('#D6FFFFFF')
@@ -222,6 +238,65 @@ struct UnlockDesktopConfigPage {
       }, (preset: UnlockDesktopPresetItem) => preset.label)
     }
     .width('100%')
+  }
+
+  @Builder
+  private buildReboundLevelButton(level: UnlockDesktopReboundLevel) {
+    Column({ space: 2 }) {
+      Text(level.label)
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.isSelected(this.unlockIconReboundPercent, level.value) ? '#101820' : '#FFFFFFFF')
+
+      Text(`${level.value}%`)
+        .fontSize(11)
+        .fontColor(this.isSelected(this.unlockIconReboundPercent, level.value) ? '#99101820' : '#BFFFFFFF')
+    }
+    .layoutWeight(1)
+    .height(48)
+    .padding({ top: 6, bottom: 6 })
+    .backgroundColor(this.isSelected(this.unlockIconReboundPercent, level.value) ? '#F2FFFFFF' : '#18FFFFFF')
+    .borderRadius(16)
+    .border({
+      width: 1,
+      color: this.isSelected(this.unlockIconReboundPercent, level.value) ? '#CCFFFFFF' : '#22FFFFFF'
+    })
+    .onClick(() => {
+      this.applyReboundLevel(level);
+    })
+  }
+
+  @Builder
+  private buildReboundLevelSelector() {
+    Column({ space: 10 }) {
+      Row() {
+        Text('回弹档位')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFFFF')
+
+        Text('默认：中档')
+          .fontSize(12)
+          .fontColor('#CCFFFFFF')
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Row({ space: 8 }) {
+        ForEach(this.reboundLevels, (level: UnlockDesktopReboundLevel) => {
+          this.buildReboundLevelButton(level)
+        }, (level: UnlockDesktopReboundLevel) => level.label)
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor('#16FFFFFF')
+    .borderRadius(20)
+    .border({
+      width: 1,
+      color: '#1FFFFFFF'
+    })
   }
 
   @Builder
@@ -404,6 +479,7 @@ struct UnlockDesktopConfigPage {
         Scroll() {
           Column({ space: 24 }) {
             this.buildHeader()
+            this.buildReboundLevelSelector()
             this.buildPresetList()
             this.buildPresetDetail()
             this.buildSabParameterColumn()
